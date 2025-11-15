@@ -1,11 +1,16 @@
 // middleware.ts
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 
-export async function middleware(req: NextRequest) {
-    // resposta padrão
-    const res = NextResponse.next()
+export async function middleware(request: NextRequest) {
+    const { pathname } = request.nextUrl
+    const isAuthRoute = pathname.startsWith('/login')
+
+    let response = NextResponse.next({
+        request: {
+            headers: request.headers,
+        },
+    })
 
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,43 +18,53 @@ export async function middleware(req: NextRequest) {
         {
             cookies: {
                 get(name: string) {
-                    return req.cookies.get(name)?.value
+                    return request.cookies.get(name)?.value
                 },
                 set(name: string, value: string, options: CookieOptions) {
-                    // importante: escrever o cookie na resposta
-                    res.cookies.set({ name, value, ...options })
+                    request.cookies.set({ name, value, ...options })
+                    response = NextResponse.next({
+                        request: { headers: request.headers },
+                    })
+                    response.cookies.set({ name, value, ...options })
                 },
                 remove(name: string, options: CookieOptions) {
-                    res.cookies.set({ name, value: '', ...options })
+                    request.cookies.set({ name, value: '', ...options })
+                    response = NextResponse.next({
+                        request: { headers: request.headers },
+                    })
+                    response.cookies.set({ name, value: '', ...options })
                 },
             },
         }
     )
 
-    const { data, error } = await supabase.auth.getUser()
-    const user = data?.user
-    const { pathname } = req.nextUrl
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
 
-    const isAuthRoute = pathname.startsWith('/login')
+    if (isAuthRoute) {
+        if (user) {
+            const url = request.nextUrl.clone()
+            url.pathname = '/'
+            url.searchParams.delete('from')
+            return NextResponse.redirect(url)
+        }
 
-    if (!user && !isAuthRoute) {
-        const redirectUrl = req.nextUrl.clone()
-        redirectUrl.pathname = '/login'
-        redirectUrl.searchParams.set('from', pathname)
-        return NextResponse.redirect(redirectUrl)
+        return response
     }
 
-    if (user && isAuthRoute) {
-        const redirectUrl = req.nextUrl.clone()
-        redirectUrl.pathname = '/'
-        redirectUrl.searchParams.delete('from')
-        return NextResponse.redirect(redirectUrl)
+    if (!user) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/login'
+        url.searchParams.set('from', pathname)
+        return NextResponse.redirect(url)
     }
 
-    return res
+    return response
 }
 
-// Define em quais rotas o middleware roda
 export const config = {
-    matcher: ['/((?!_next/static|_next/image|favicon.ico|icons/|images/).*)',],
+    matcher: [
+        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    ],
 }
