@@ -28,7 +28,7 @@ export function PaymentDialog({ receivable, open, onOpenChange }: PaymentDialogP
   if (!receivable) return null
 
   const handleConfirm = () => {
-    console.log('[v0] Payment confirmed:', { receivable, paymentOption })
+    console.log('[modaltech] Payment confirmed:', { receivable, paymentOption })
     onOpenChange(false)
   }
 

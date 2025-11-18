@@ -57,7 +57,7 @@ export function ExpenseDialog({ open, onOpenChange, expense }: ExpenseDialogProp
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('[v0] Expense saved:', formData)
+    console.log('[modaltech] Expense saved:', formData)
     onOpenChange(false)
   }
 

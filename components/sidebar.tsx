@@ -27,10 +27,14 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
       <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r bg-card px-6 pb-4">
         <div className="flex h-16 shrink-0 items-center border-b">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Package className="h-6 w-6" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground overflow-hidden">
+              <img
+                src="/icon.jpg"
+                alt="Logo"
+                className="object-cover"
+              />
             </div>
-            <span className="text-lg font-semibold">Sales App</span>
+            <span className="text-lg font-semibold">Tubarão Perfum</span>
           </div>
         </div>
         <nav className="flex flex-1 flex-col">

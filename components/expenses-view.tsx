@@ -53,7 +53,7 @@ export function ExpensesView() {
   }
 
   const handleMarkAsPaid = (id: string) => {
-    console.log('[v0] Marking expense as paid:', id)
+    console.log('[modaltech] Marking expense as paid:', id)
   }
 
   return (

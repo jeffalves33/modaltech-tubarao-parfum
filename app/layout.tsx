@@ -7,9 +7,9 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Perfume Sales - Sistema de Gestão',
+  title: 'Modaltech - Tubarão Perfum',
   description: 'Sistema completo de gestão de vendas de perfumes',
-  generator: 'v0.app',
+  generator: 'Modaltech',
   icons: {
     icon: [
       {
