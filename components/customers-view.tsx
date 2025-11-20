@@ -1,12 +1,31 @@
+// components/customers-view.tsx
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Search, Pencil, Trash2, Phone, DollarSign, UserCheck, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  Phone,
+  DollarSign,
+  UserCheck,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react'
 import { CustomerDialog } from '@/components/customer-dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { supabase } from '@/lib/supabaseClient'
 
 interface Customer {
   id: string
@@ -26,13 +45,120 @@ export function CustomersView() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
-  const [customers] = useState<Customer[]>([
-    { id: '1', name: 'Maria Silva', phone: '(11) 98765-4321', cpf: '123.456.789-00', totalPurchases: 2450, pendingAmount: 450 },
-    { id: '2', name: 'João Santos', phone: '(11) 98765-4322', cpf: '123.456.789-01', totalPurchases: 1820, pendingAmount: 253.34 },
-    { id: '3', name: 'Ana Costa', phone: '(11) 98765-4323', cpf: '123.456.789-02', totalPurchases: 3200, pendingAmount: 0 },
-    { id: '4', name: 'Pedro Lima', phone: '(11) 98765-4324', cpf: '123.456.789-03', totalPurchases: 980, pendingAmount: 280 },
-    { id: '5', name: 'Carla Souza', phone: '(11) 98765-4325', cpf: '123.456.789-04', totalPurchases: 1560, pendingAmount: 600 },
-  ])
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadCustomers = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const [customersRes, salesRes, receivablesRes, paymentsRes] =
+        await Promise.all([
+          supabase
+            .from('customers')
+            .select('id, name, phone, cpf'),
+          supabase
+            .from('sales')
+            .select('id, customer_id, total_amount, status'),
+          supabase
+            .from('receivables')
+            .select('id, customer_id, amount, status'),
+          supabase
+            .from('payments')
+            .select('receivable_id, amount'),
+        ])
+
+      if (customersRes.error) throw customersRes.error
+      if (salesRes.error) throw salesRes.error
+      if (receivablesRes.error) throw receivablesRes.error
+      if (paymentsRes.error) throw paymentsRes.error
+
+      const customersData = (customersRes.data ?? []) as {
+        id: string
+        name: string
+        phone: string | null
+        cpf: string | null
+      }[]
+
+      const salesData = (salesRes.data ?? []) as {
+        id: string
+        customer_id: string | null
+        total_amount: number | string | null
+        status: string
+      }[]
+
+      const receivablesData = (receivablesRes.data ?? []) as {
+        id: string
+        customer_id: string | null
+        amount: number | string | null
+        status: string
+      }[]
+
+      const paymentsData = (paymentsRes.data ?? []) as {
+        receivable_id: string | null
+        amount: number | string | null
+      }[]
+
+      // total de compras por cliente (somando vendas não canceladas)
+      const totalPurchasesByCustomer: Record<string, number> = {}
+      for (const s of salesData) {
+        if (!s.customer_id) continue
+        if (s.status === 'canceled') continue
+        const amount = Number(s.total_amount ?? 0)
+        totalPurchasesByCustomer[s.customer_id] =
+          (totalPurchasesByCustomer[s.customer_id] ?? 0) + amount
+      }
+
+      // pagamentos por receivable_id
+      const paymentsByReceivable: Record<string, number> = {}
+      for (const p of paymentsData) {
+        if (!p.receivable_id) continue
+        paymentsByReceivable[p.receivable_id] =
+          (paymentsByReceivable[p.receivable_id] ?? 0) +
+          Number(p.amount ?? 0)
+      }
+
+      // pendência por cliente com base em receivables abertos/parciais
+      const pendingByCustomer: Record<string, number> = {}
+      for (const r of receivablesData) {
+        if (!r.customer_id) continue
+        if (r.status !== 'open' && r.status !== 'partial') continue
+
+        const paid = paymentsByReceivable[r.id] ?? 0
+        const outstanding = Math.max(
+          Number(r.amount ?? 0) - paid,
+          0,
+        )
+
+        if (outstanding <= 0) continue
+
+        pendingByCustomer[r.customer_id] =
+          (pendingByCustomer[r.customer_id] ?? 0) + outstanding
+      }
+
+      const mapped: Customer[] = customersData.map((c) => ({
+        id: c.id,
+        name: c.name,
+        phone: c.phone ?? '',
+        cpf: c.cpf ?? '',
+        totalPurchases: totalPurchasesByCustomer[c.id] ?? 0,
+        pendingAmount: pendingByCustomer[c.id] ?? 0,
+      }))
+
+      setCustomers(mapped)
+    } catch (err: any) {
+      console.error('Erro ao carregar clientes', err)
+      setError('Erro ao carregar clientes. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadCustomers()
+  }, [])
 
   let filteredCustomers = customers.filter(c =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -66,7 +192,7 @@ export function CustomersView() {
   const totalToReceive = customers.reduce((sum, c) => sum + c.pendingAmount, 0)
   const customersWithDebt = customers.filter(c => c.pendingAmount > 0).length
 
-  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage)
+  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage) || 1
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
   const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex)
@@ -79,6 +205,29 @@ export function CustomersView() {
   const handleNew = () => {
     setEditingCustomer(null)
     setIsDialogOpen(true)
+  }
+
+  const handleDelete = async (customer: Customer) => {
+    const confirmed = window.confirm(
+      `Deseja realmente excluir o cliente "${customer.name}"?`,
+    )
+    if (!confirmed) return
+
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', customer.id)
+
+      if (error) throw error
+
+      await loadCustomers()
+    } catch (err: any) {
+      console.error('Erro ao excluir cliente', err)
+      alert(
+        'Erro ao excluir cliente. Ele pode ter vendas vinculadas. Se preferir, mantenha o cadastro e apenas pare de utilizá-lo.',
+      )
+    }
   }
 
   return (
@@ -104,7 +253,7 @@ export function CustomersView() {
             <div className="text-2xl font-bold">{customers.length}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <p className="text-sm font-medium text-muted-foreground">A Receber</p>
@@ -129,6 +278,14 @@ export function CustomersView() {
       <Card>
         <CardHeader>
           <div className="space-y-3">
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
+            {loading && (
+              <p className="text-sm text-muted-foreground">
+                Carregando clientes...
+              </p>
+            )}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -181,12 +338,14 @@ export function CustomersView() {
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1.5">
                         <Phone className="h-3.5 w-3.5" />
-                        {customer.phone}
+                        {customer.phone && customer.phone.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3')}
                       </div>
-                      <div>CPF: {customer.cpf}</div>
+                      <div>
+                        CPF: {customer.cpf && customer.cpf.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4')}
+                      </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex gap-6">
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">Total Compras</p>
@@ -205,7 +364,11 @@ export function CustomersView() {
                   <Button variant="outline" size="sm" onClick={() => handleEdit(customer)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button variant="outline" size="sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDelete(customer)}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -270,6 +433,7 @@ export function CustomersView() {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         customer={editingCustomer}
+        onSaved={loadCustomers}
       />
     </div>
   )
