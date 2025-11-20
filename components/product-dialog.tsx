@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { supabase } from '@/lib/supabaseClient'
 
 interface Product {
   id: string
@@ -21,9 +22,10 @@ interface ProductDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   product: Product | null
+  onSaved?: () => void
 }
 
-export function ProductDialog({ open, onOpenChange, product }: ProductDialogProps) {
+export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductDialogProps) {
   const [formData, setFormData] = useState({
     name: '',
     brand: '',
@@ -32,6 +34,9 @@ export function ProductDialog({ open, onOpenChange, product }: ProductDialogProp
     salePrice: '',
     stock: '',
   })
+
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (product) {
@@ -53,12 +58,66 @@ export function ProductDialog({ open, onOpenChange, product }: ProductDialogProp
         stock: '',
       })
     }
+    setError(null)
   }, [product, open])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle save logic
-    onOpenChange(false)
+    setError(null)
+    setLoading(true)
+
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+
+      if (userError) throw userError
+      const userId = user?.id ?? null
+
+      const purchasePrice = Number(formData.costPrice.replace(',', '.')) || 0
+      const salePrice = Number(formData.salePrice.replace(',', '.')) || 0
+      const stockQuantity = Number(formData.stock) || 0
+
+      const payload: any = {
+        name: formData.name.trim(),
+        brand: formData.brand.trim(),
+        description: formData.size.trim(), // usamos description como "tamanho"
+        purchase_price: purchasePrice,
+        sale_price: salePrice,
+        stock_quantity: stockQuantity,
+        is_active: true,
+      }
+
+      if (userId) {
+        payload.created_by = userId
+      }
+
+      if (product) {
+        // update
+        const { error: updateError } = await supabase
+          .from('products')
+          .update(payload)
+          .eq('id', product.id)
+
+        if (updateError) throw updateError
+      } else {
+        // insert
+        const { error: insertError } = await supabase
+          .from('products')
+          .insert(payload)
+
+        if (insertError) throw insertError
+      }
+
+      onSaved?.()
+      onOpenChange(false)
+    } catch (err: any) {
+      console.error('Erro ao salvar produto', err)
+      setError('Erro ao salvar produto. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -67,6 +126,11 @@ export function ProductDialog({ open, onOpenChange, product }: ProductDialogProp
         <DialogHeader>
           <DialogTitle>{product ? 'Editar Produto' : 'Novo Produto'}</DialogTitle>
         </DialogHeader>
+
+        {error && (
+          <p className="text-sm text-destructive mb-2">{error}</p>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -91,7 +155,7 @@ export function ProductDialog({ open, onOpenChange, product }: ProductDialogProp
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="size">Tamanho</Label>
+              <Label htmlFor="size">Descrição</Label>
               <Input
                 id="size"
                 placeholder="ex: 100ml"
@@ -141,7 +205,9 @@ export function ProductDialog({ open, onOpenChange, product }: ProductDialogProp
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit">Salvar</Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Salvando...' : 'Salvar'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
