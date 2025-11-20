@@ -1,6 +1,7 @@
+// components/sales-view.tsx
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,13 +16,13 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { SaleDetailsDialog } from '@/components/sale-details-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { supabase } from '@/lib/supabaseClient'
 
 interface Sale {
   id: string
   date: string
   customer: string
-  product: string
-  quantity: number
+  productsSummary: string
   totalValue: number
   paymentType: 'cash' | 'credit'
   installments?: number
@@ -39,38 +40,197 @@ export function SalesView() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
-  const [sales] = useState<Sale[]>([
-    { id: '4', date: '2024-01-15', customer: 'Maria Silva', product: 'Chanel Nº 5', quantity: 1, totalValue: 450, paymentType: 'cash', paidAmount: 450, status: 'paid' },
-    { id: '3', date: '2024-01-14', customer: 'João Santos', product: 'Dior Sauvage', quantity: 1, totalValue: 380, paymentType: 'credit', installments: 3, paidAmount: 0, status: 'pending' },
-    { id: '2', date: '2024-01-14', customer: 'Ana Costa', product: 'Carolina Herrera', quantity: 1, totalValue: 320, paymentType: 'cash', paidAmount: 320, status: 'paid' },
-    { id: '1', date: '2024-01-13', customer: 'Pedro Lima', product: 'Hugo Boss', quantity: 1, totalValue: 280, paymentType: 'credit', installments: 2, paidAmount: 140, status: 'partial' },
-  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()))
+  const [sales, setSales] = useState<Sale[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  let filteredSales = sales.filter(s =>
-    s.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.product.toLowerCase().includes(searchTerm.toLowerCase())
+  const loadSales = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const [salesRes, customersRes, saleItemsRes, productsRes, receivablesRes, paymentsRes] =
+        await Promise.all([
+          supabase
+            .from('sales')
+            .select('id, sale_date, total_amount, customer_id')
+            .order('sale_date', { ascending: false }),
+          supabase.from('customers').select('id, name'),
+          supabase.from('sale_items').select('sale_id, product_id, quantity, subtotal'),
+          supabase.from('products').select('id, name'),
+          supabase.from('receivables').select('sale_id, amount'),
+          supabase.from('payments').select('sale_id, amount'),
+        ])
+
+      if (salesRes.error) throw salesRes.error
+      if (customersRes.error) throw customersRes.error
+      if (saleItemsRes.error) throw saleItemsRes.error
+      if (productsRes.error) throw productsRes.error
+      if (receivablesRes.error) throw receivablesRes.error
+      if (paymentsRes.error) throw paymentsRes.error
+
+      const salesData = (salesRes.data ?? []) as {
+        id: string
+        sale_date: string
+        total_amount: number | string | null
+        customer_id: string | null
+      }[]
+
+      const customers = (customersRes.data ?? []) as { id: string; name: string }[]
+      const saleItems = (saleItemsRes.data ?? []) as {
+        sale_id: string
+        product_id: string
+        quantity: number
+        subtotal: number | string
+      }[]
+      const products = (productsRes.data ?? []) as { id: string; name: string }[]
+      const receivables = (receivablesRes.data ?? []) as {
+        sale_id: string
+        amount: number | string
+      }[]
+      const payments = (paymentsRes.data ?? []) as {
+        sale_id: string
+        amount: number | string
+      }[]
+
+      const customerMap = customers.reduce<Record<string, string>>((acc, c) => {
+        acc[c.id] = c.name
+        return acc
+      }, {})
+
+      const productMap = products.reduce<Record<string, string>>((acc, p) => {
+        acc[p.id] = p.name
+        return acc
+      }, {})
+
+      const saleItemsBySale: Record<
+        string,
+        { product_id: string; quantity: number; subtotal: number }[]
+      > = {}
+      for (const it of saleItems) {
+        if (!saleItemsBySale[it.sale_id]) saleItemsBySale[it.sale_id] = []
+        saleItemsBySale[it.sale_id].push({
+          product_id: it.product_id,
+          quantity: it.quantity,
+          subtotal: Number(it.subtotal ?? 0),
+        })
+      }
+
+      const receivablesBySale: Record<string, { amount: number }[]> = {}
+      for (const r of receivables) {
+        if (!receivablesBySale[r.sale_id]) receivablesBySale[r.sale_id] = []
+        receivablesBySale[r.sale_id].push({ amount: Number(r.amount ?? 0) })
+      }
+
+      const paymentsBySale: Record<string, number> = {}
+      for (const p of payments) {
+        paymentsBySale[p.sale_id] =
+          (paymentsBySale[p.sale_id] ?? 0) + Number(p.amount ?? 0)
+      }
+
+      const saleList: Sale[] = salesData.map((s) => {
+        const totalValue = Number(s.total_amount ?? 0)
+        const items = saleItemsBySale[s.id] ?? []
+
+        const productsSummary =
+          items.length === 0
+            ? 'Sem itens cadastrados'
+            : items
+              .map((it) => {
+                const name = productMap[it.product_id] ?? 'Produto'
+                return `${name} (${it.quantity}x)`
+              })
+              .join(', ')
+
+        const saleReceivables = receivablesBySale[s.id] ?? []
+        const paidAmount = paymentsBySale[s.id] ?? 0
+        const totalReceivable =
+          saleReceivables.length > 0
+            ? saleReceivables.reduce((sum, r) => sum + r.amount, 0)
+            : totalValue
+
+        const outstanding = totalReceivable - paidAmount
+
+        let status: Sale['status']
+        if (outstanding <= 0) status = 'paid'
+        else if (paidAmount > 0) status = 'partial'
+        else status = 'pending'
+
+        const paymentType: Sale['paymentType'] =
+          saleReceivables.length > 0 ? 'credit' : 'cash'
+        const installments =
+          saleReceivables.length > 0 ? saleReceivables.length : undefined
+
+        return {
+          id: s.id,
+          date: new Date(s.sale_date).toLocaleDateString('pt-BR'),
+          customer:
+            (s.customer_id && customerMap[s.customer_id]) ||
+            'Cliente não identificado',
+          productsSummary,
+          totalValue,
+          paymentType,
+          installments,
+          paidAmount,
+          status,
+        }
+      })
+
+      setSales(saleList)
+    } catch (err: any) {
+      console.error('Erro ao carregar vendas', err)
+      setError('Erro ao carregar vendas. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadSales()
+  }, [])
+
+  let filteredSales = sales.filter(
+    (s) =>
+      s.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.productsSummary.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
   if (filterStatus !== 'all') {
-    filteredSales = filteredSales.filter(s => s.status === filterStatus)
+    filteredSales = filteredSales.filter((s) => s.status === filterStatus)
   }
   if (filterPayment !== 'all') {
-    filteredSales = filteredSales.filter(s => s.paymentType === filterPayment)
+    filteredSales = filteredSales.filter((s) => s.paymentType === filterPayment)
   }
 
-  const totalPages = Math.ceil(filteredSales.length / itemsPerPage)
+  const totalPages = Math.ceil(filteredSales.length / itemsPerPage) || 1
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
   const paginatedSales = filteredSales.slice(startIndex, endIndex)
 
   const getStatusBadge = (status: Sale['status']) => {
     const variants = {
-      paid: { label: 'Pago', variant: 'default' as const, className: 'bg-emerald-500 hover:bg-emerald-600' },
-      pending: { label: 'Pendente', variant: 'secondary' as const, className: 'bg-amber-500 hover:bg-amber-600 text-white' },
-      partial: { label: 'Parcial', variant: 'outline' as const, className: 'border-amber-500 text-amber-700' },
+      paid: {
+        label: 'Pago',
+        variant: 'default' as const,
+        className: 'bg-emerald-500 hover:bg-emerald-600',
+      },
+      pending: {
+        label: 'Pendente',
+        variant: 'secondary' as const,
+        className: 'bg-amber-500 hover:bg-amber-600 text-white',
+      },
+      partial: {
+        label: 'Parcial',
+        variant: 'outline' as const,
+        className: 'border-amber-500 text-amber-700',
+      },
     }
     const config = variants[status]
-    return <Badge variant={config.variant} className={config.className}>{config.label}</Badge>
+    return (
+      <Badge variant={config.variant} className={config.className}>
+        {config.label}
+      </Badge>
+    )
   }
 
   const handleViewDetails = (sale: Sale) => {
@@ -83,7 +243,9 @@ export function SalesView() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Vendas</h1>
-          <p className="text-muted-foreground">Registre e acompanhe suas vendas</p>
+          <p className="text-muted-foreground">
+            Registre e acompanhe suas vendas
+          </p>
         </div>
         <Button onClick={() => setIsDialogOpen(true)} className="gap-2">
           <Plus className="h-4 w-4" />
@@ -107,7 +269,13 @@ export function SalesView() {
               />
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
-              <Select value={filterStatus} onValueChange={(value) => { setFilterStatus(value); setCurrentPage(1); }}>
+              <Select
+                value={filterStatus}
+                onValueChange={(value) => {
+                  setFilterStatus(value)
+                  setCurrentPage(1)
+                }}
+              >
                 <SelectTrigger className="w-full sm:w-[200px]">
                   <Filter className="mr-2 h-4 w-4" />
                   <SelectValue placeholder="Status" />
@@ -119,7 +287,13 @@ export function SalesView() {
                   <SelectItem value="partial">Parcial</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={filterPayment} onValueChange={(value) => { setFilterPayment(value); setCurrentPage(1); }}>
+              <Select
+                value={filterPayment}
+                onValueChange={(value) => {
+                  setFilterPayment(value)
+                  setCurrentPage(1)
+                }}
+              >
                 <SelectTrigger className="w-full sm:w-[200px]">
                   <SelectValue placeholder="Pagamento" />
                 </SelectTrigger>
@@ -133,6 +307,12 @@ export function SalesView() {
           </div>
         </CardHeader>
         <CardContent>
+          {error && (
+            <p className="mb-3 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -149,8 +329,12 @@ export function SalesView() {
                   <tr key={sale.id} className="border-b last:border-0">
                     <td className="py-4">{sale.date}</td>
                     <td className="py-4 font-medium">{sale.customer}</td>
-                    <td className="py-4 text-right font-medium pr-4">R$ {sale.totalValue.toFixed(2)}</td>
-                    <td className="py-4 pl-4">{getStatusBadge(sale.status)}</td>
+                    <td className="py-4 text-right font-medium pr-4">
+                      R$ {sale.totalValue.toFixed(2)}
+                    </td>
+                    <td className="py-4 pl-4">
+                      {getStatusBadge(sale.status)}
+                    </td>
                     <td className="py-4">
                       <div className="flex justify-end">
                         <DropdownMenu>
@@ -160,7 +344,9 @@ export function SalesView() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewDetails(sale)}>
+                            <DropdownMenuItem
+                              onClick={() => handleViewDetails(sale)}
+                            >
                               Ver Detalhes
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -169,20 +355,39 @@ export function SalesView() {
                     </td>
                   </tr>
                 ))}
+
+                {!loading && paginatedSales.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="py-6 text-center text-sm text-muted-foreground"
+                    >
+                      Nenhuma venda encontrada.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
 
+          {loading && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Carregando vendas...
+            </p>
+          )}
+
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4 border-t">
+            <div className="flex items-center justify-between pt-4 border-t mt-4">
               <p className="text-sm text-muted-foreground">
-                Mostrando {startIndex + 1} a {Math.min(endIndex, filteredSales.length)} de {filteredSales.length} vendas
+                Mostrando {startIndex + 1} a{' '}
+                {Math.min(endIndex, filteredSales.length)} de{' '}
+                {filteredSales.length} vendas
               </p>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -202,7 +407,7 @@ export function SalesView() {
                     return (
                       <Button
                         key={page}
-                        variant={currentPage === page ? "default" : "outline"}
+                        variant={currentPage === page ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => setCurrentPage(page)}
                         className="w-8 h-8 p-0"
@@ -215,7 +420,9 @@ export function SalesView() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
                   disabled={currentPage === totalPages}
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -226,7 +433,11 @@ export function SalesView() {
         </CardContent>
       </Card>
 
-      <SaleDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
+      <SaleDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        onSaleCreated={loadSales}
+      />
       <SaleDetailsDialog
         sale={selectedSale}
         open={isDetailsOpen}

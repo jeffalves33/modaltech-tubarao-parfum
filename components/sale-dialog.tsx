@@ -1,19 +1,40 @@
+// components/sales-dialog.tsx
 'use client'
 
-import { useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { useEffect, useState } from 'react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Check, ChevronsUpDown, Printer, Share2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabaseClient'
 
 interface SaleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSaleCreated?: () => void
 }
 
 interface Installment {
@@ -27,15 +48,37 @@ interface ProductItem {
   name: string
   quantity: number
   unitPrice: number
+  unitCost: number
   subtotal: number
 }
 
-export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
+interface DbCustomer {
+  id: string
+  name: string
+  phone: string | null
+}
+
+interface DbProduct {
+  id: string
+  name: string
+  sale_price: number
+  purchase_price: number
+  stock_quantity: number
+}
+
+export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProps) {
   const [openCustomer, setOpenCustomer] = useState(false)
   const [openProduct, setOpenProduct] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const [saleData, setSaleData] = useState<any>(null)
-  
+
+  const [customers, setCustomers] = useState<DbCustomer[]>([])
+  const [availableProducts, setAvailableProducts] = useState<DbProduct[]>([])
+
+  const [loadingBase, setLoadingBase] = useState(false)
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
   const [formData, setFormData] = useState({
     customer: '',
     customerName: '',
@@ -54,39 +97,102 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
 
   const [installmentDates, setInstallmentDates] = useState<Installment[]>([])
 
-  const customers = [
-    { id: '1', name: 'Maria Silva', phone: '(11) 98765-4321' },
-    { id: '2', name: 'João Santos', phone: '(11) 98765-4322' },
-    { id: '3', name: 'Ana Costa', phone: '(11) 98765-4323' },
-    { id: '4', name: 'Pedro Lima', phone: '(11) 98765-4324' },
-    { id: '5', name: 'Carla Souza', phone: '(11) 98765-4325' },
-  ]
-
-  const availableProducts = [
-    { id: '1', name: 'Chanel Nº 5', price: 450.00, stock: 15 },
-    { id: '2', name: 'Dior Sauvage', price: 380.00, stock: 22 },
-    { id: '3', name: 'Carolina Herrera Good Girl', price: 320.00, stock: 18 },
-    { id: '4', name: 'Hugo Boss Bottled', price: 280.00, stock: 30 },
-    { id: '5', name: 'Paco Rabanne One Million', price: 350.00, stock: 12 },
-    { id: '6', name: 'Versace Eros', price: 340.00, stock: 20 },
-  ]
-
+  // valores calculados em tempo real
   const subtotalValue = products.reduce((sum, p) => sum + p.subtotal, 0)
   const discountValue = subtotalValue * (Number(formData.discount) / 100)
   const totalValue = subtotalValue - discountValue
 
-  const handleAddProduct = () => {
-    if (currentProduct.id && currentProduct.quantity && currentProduct.unitPrice) {
-      const newProduct: ProductItem = {
-        id: currentProduct.id,
-        name: currentProduct.name,
-        quantity: Number(currentProduct.quantity),
-        unitPrice: Number(currentProduct.unitPrice),
-        subtotal: Number(currentProduct.quantity) * Number(currentProduct.unitPrice)
+  // carrega clientes e produtos ao abrir o diálogo
+  useEffect(() => {
+    if (!open) return
+
+    let cancelled = false
+
+    async function loadBaseData() {
+      setLoadingBase(true)
+      setError(null)
+      try {
+        const [customersRes, productsRes] = await Promise.all([
+          supabase.from('customers').select('id, name, phone'),
+          supabase
+            .from('products')
+            .select('id, name, sale_price, purchase_price, stock_quantity')
+            .eq('is_active', true),
+        ])
+
+        if (customersRes.error) throw customersRes.error
+        if (productsRes.error) throw productsRes.error
+
+        if (cancelled) return
+
+        setCustomers((customersRes.data ?? []) as DbCustomer[])
+        setAvailableProducts((productsRes.data ?? []) as DbProduct[])
+      } catch (err: any) {
+        console.error('Erro ao carregar clientes/produtos', err)
+        if (!cancelled)
+          setError('Erro ao carregar clientes ou produtos. Tente novamente.')
+      } finally {
+        if (!cancelled) setLoadingBase(false)
       }
-      setProducts([...products, newProduct])
-      setCurrentProduct({ id: '', name: '', quantity: '1', unitPrice: '' })
     }
+
+    loadBaseData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [open])
+
+  const handleAddProduct = () => {
+    setError(null)
+
+    if (!currentProduct.id || !currentProduct.quantity) {
+      alert('Selecione um produto e informe a quantidade.')
+      return
+    }
+
+    const baseProduct = availableProducts.find((p) => p.id === currentProduct.id)
+    if (!baseProduct) {
+      alert('Produto inválido.')
+      return
+    }
+
+    const quantity = Number(currentProduct.quantity)
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      alert('Quantidade inválida.')
+      return
+    }
+
+    if (quantity > baseProduct.stock_quantity) {
+      alert(
+        `Estoque insuficiente. Estoque atual: ${baseProduct.stock_quantity} unidade(s).`,
+      )
+      return
+    }
+
+    const unitPrice = currentProduct.unitPrice
+      ? Number(currentProduct.unitPrice)
+      : Number(baseProduct.sale_price)
+
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      alert('Preço inválido.')
+      return
+    }
+
+    const unitCost = Number(baseProduct.purchase_price) || 0
+    const subtotal = quantity * unitPrice
+
+    const newProduct: ProductItem = {
+      id: baseProduct.id,
+      name: baseProduct.name,
+      quantity,
+      unitPrice,
+      unitCost,
+      subtotal,
+    }
+
+    setProducts((prev) => [...prev, newProduct])
+    setCurrentProduct({ id: '', name: '', quantity: '1', unitPrice: '' })
   }
 
   const handleRemoveProduct = (index: number) => {
@@ -96,20 +202,22 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
   const handleInstallmentsChange = (value: string) => {
     setFormData({ ...formData, installments: value })
     const numInstallments = Number(value)
+    if (!Number.isFinite(numInstallments) || numInstallments <= 0) return
+
     const installmentValue = totalValue / numInstallments
-    
+
     const newInstallments: Installment[] = []
     const today = new Date()
-    
+
     for (let i = 0; i < numInstallments; i++) {
       const dueDate = new Date(today.getFullYear(), today.getMonth() + i + 1, 1)
       newInstallments.push({
         number: i + 1,
         value: installmentValue,
-        dueDate: dueDate.toISOString().split('T')[0]
+        dueDate: dueDate.toISOString().split('T')[0],
       })
     }
-    
+
     setInstallmentDates(newInstallments)
   }
 
@@ -119,22 +227,134 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
     setInstallmentDates(updated)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
+
     if (products.length === 0) {
       alert('Adicione pelo menos um produto')
       return
     }
-    setSaleData({
-      ...formData,
-      products,
-      subtotalValue,
-      discountValue,
-      totalValue,
-      installmentDates: formData.paymentType === 'credit' ? installmentDates : [],
-      date: new Date().toLocaleDateString('pt-BR'),
-    })
-    setShowSuccess(true)
+
+    setSubmitLoading(true)
+
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+
+      if (userError) throw userError
+      const userId = user?.id ?? null
+
+      const discountPercent = Number(formData.discount) || 0
+      const currentSubtotal = products.reduce((sum, p) => sum + p.subtotal, 0)
+      const currentDiscountValue = currentSubtotal * (discountPercent / 100)
+      const currentTotalValue = currentSubtotal - currentDiscountValue
+
+      // 1) Cria a venda (sales)
+      const { data: saleInsert, error: saleError } = await supabase
+        .from('sales')
+        .insert({
+          customer_id: formData.customer || null,
+          total_amount: currentTotalValue,
+          discount: currentDiscountValue,
+          status: formData.paymentType === 'cash' ? 'paid' : 'open',
+          created_by: userId,
+        })
+        .select('id')
+        .single()
+
+      if (saleError || !saleInsert) {
+        throw saleError || new Error('Falha ao criar venda')
+      }
+
+      const saleId = saleInsert.id as string
+
+      // 2) Itens da venda (sale_items)
+      const saleItemsPayload = products.map((p) => ({
+        sale_id: saleId,
+        product_id: p.id,
+        quantity: p.quantity,
+        unit_price: p.unitPrice,
+        unit_cost: p.unitCost,
+        subtotal: p.subtotal,
+      }))
+
+      const { error: itemsError } = await supabase
+        .from('sale_items')
+        .insert(saleItemsPayload)
+
+      if (itemsError) throw itemsError
+
+      // 3) Atualiza estoque (products.stock_quantity)
+      for (const p of products) {
+        const baseProduct = availableProducts.find((bp) => bp.id === p.id)
+        if (!baseProduct) continue
+        const newStock = baseProduct.stock_quantity - p.quantity
+
+        const { error: stockError } = await supabase
+          .from('products')
+          .update({ stock_quantity: newStock })
+          .eq('id', p.id)
+
+        if (stockError) throw stockError
+      }
+
+      // 4) Recebíveis / Pagamento
+      if (formData.paymentType === 'credit') {
+        if (installmentDates.length === 0) {
+          throw new Error(
+            'Defina as parcelas antes de salvar uma venda parcelada.',
+          )
+        }
+
+        const receivablesPayload = installmentDates.map((inst) => ({
+          sale_id: saleId,
+          customer_id: formData.customer || null,
+          installment_number: inst.number,
+          due_date: inst.dueDate,
+          amount: inst.value,
+          status: 'open',
+        }))
+
+        const { error: recError } = await supabase
+          .from('receivables')
+          .insert(receivablesPayload)
+
+        if (recError) throw recError
+      } else {
+        // venda à vista: registra pagamento imediato
+        if (currentTotalValue > 0) {
+          const { error: payError } = await supabase.from('payments').insert({
+            sale_id: saleId,
+            customer_id: formData.customer || null,
+            amount: currentTotalValue,
+            method: 'cash',
+          })
+          if (payError) throw payError
+        }
+      }
+
+      // 5) Dados para o recibo / sucesso
+      setSaleData({
+        ...formData,
+        products,
+        subtotalValue: currentSubtotal,
+        discountValue: currentDiscountValue,
+        totalValue: currentTotalValue,
+        installmentDates:
+          formData.paymentType === 'credit' ? installmentDates : [],
+        date: new Date().toLocaleDateString('pt-BR'),
+      })
+      setShowSuccess(true)
+      onSaleCreated?.()
+    } catch (err: any) {
+      console.error('Erro ao registrar venda', err)
+      setError(err.message || 'Erro ao registrar venda. Tente novamente.')
+    } finally {
+      setSubmitLoading(false)
+    }
   }
 
   const handlePrint = () => {
@@ -142,11 +362,36 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
   }
 
   const handleSendWhatsApp = () => {
-    const customer = customers.find(c => c.id === formData.customer)
-    const productsText = products.map(p => `${p.name} (${p.quantity}x) - R$ ${p.subtotal.toFixed(2)}`).join('\n')
-    const message = `*Comprovante de Venda*\n\nCliente: ${customer?.name}\n\nProdutos:\n${productsText}\n\nSubtotal: R$ ${subtotalValue.toFixed(2)}\nDesconto: R$ ${discountValue.toFixed(2)}\nValor Total: R$ ${totalValue.toFixed(2)}\nForma de Pagamento: ${formData.paymentType === 'cash' ? 'À vista' : `Parcelado ${formData.installments}x`}\n\nObrigado pela preferência!`
-    const phone = customer?.phone.replace(/\D/g, '')
-    window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message)}`, '_blank')
+    const customer = customers.find((c) => c.id === formData.customer)
+    if (!customer || !customer.phone) {
+      alert('Esta venda não está ligada a um cliente com telefone.')
+      return
+    }
+
+    const productsText = products
+      .map(
+        (p) =>
+          `${p.name} (${p.quantity}x) - R$ ${p.subtotal.toFixed(2)}`,
+      )
+      .join('\n')
+
+    const message = `*Comprovante de Venda*\n\nCliente: ${customer.name
+      }\n\nProdutos:\n${productsText}\n\nSubtotal: R$ ${subtotalValue.toFixed(
+        2,
+      )}\nDesconto: R$ ${discountValue.toFixed(
+        2,
+      )}\nValor Total: R$ ${totalValue.toFixed(
+        2,
+      )}\nForma de Pagamento: ${formData.paymentType === 'cash'
+        ? 'À vista'
+        : `Parcelado ${formData.installments}x`
+      }\n\nObrigado pela preferência!`
+
+    const phone = customer.phone.replace(/\D/g, '')
+    window.open(
+      `https://wa.me/55${phone}?text=${encodeURIComponent(message)}`,
+      '_blank',
+    )
   }
 
   const handleClose = () => {
@@ -162,6 +407,7 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
     setProducts([])
     setCurrentProduct({ id: '', name: '', quantity: '1', unitPrice: '' })
     setInstallmentDates([])
+    setError(null)
   }
 
   if (showSuccess) {
@@ -173,17 +419,31 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="rounded-lg bg-muted p-4 space-y-2">
-              <p className="text-sm"><strong>Cliente:</strong> {formData.customerName}</p>
-              <p className="text-sm"><strong>Produtos:</strong> {products.length}</p>
-              <p className="text-sm"><strong>Valor Total:</strong> R$ {totalValue.toFixed(2)}</p>
+              <p className="text-sm">
+                <strong>Cliente:</strong> {formData.customerName || '—'}
+              </p>
+              <p className="text-sm">
+                <strong>Produtos:</strong> {products.length}
+              </p>
+              <p className="text-sm">
+                <strong>Valor Total:</strong> R$ {totalValue.toFixed(2)}
+              </p>
             </div>
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={handlePrint} className="gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={handlePrint}
+              className="gap-2 w-full sm:w-auto"
+            >
               <Printer className="h-4 w-4" />
               Imprimir
             </Button>
-            <Button variant="outline" onClick={handleSendWhatsApp} className="gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={handleSendWhatsApp}
+              className="gap-2 w-full sm:w-auto"
+            >
               <Share2 className="h-4 w-4" />
               Enviar WhatsApp
             </Button>
@@ -202,6 +462,17 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
         <DialogHeader>
           <DialogTitle>Nova Venda</DialogTitle>
         </DialogHeader>
+
+        {loadingBase && (
+          <p className="text-sm text-muted-foreground mb-2">
+            Carregando clientes e produtos...
+          </p>
+        )}
+
+        {error && (
+          <p className="text-sm text-destructive mb-2">{error}</p>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="customer">Cliente</Label>
@@ -215,7 +486,7 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
                 >
                   {formData.customer
                     ? customers.find((c) => c.id === formData.customer)?.name
-                    : "Buscar cliente..."}
+                    : 'Buscar cliente...'}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -229,19 +500,29 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
                         key={customer.id}
                         value={customer.name}
                         onSelect={() => {
-                          setFormData({ ...formData, customer: customer.id, customerName: customer.name })
+                          setFormData({
+                            ...formData,
+                            customer: customer.id,
+                            customerName: customer.name,
+                          })
                           setOpenCustomer(false)
                         }}
                       >
                         <Check
                           className={cn(
-                            "mr-2 h-4 w-4",
-                            formData.customer === customer.id ? "opacity-100" : "opacity-0"
+                            'mr-2 h-4 w-4',
+                            formData.customer === customer.id
+                              ? 'opacity-100'
+                              : 'opacity-0',
                           )}
                         />
                         <div className="flex flex-col">
                           <span>{customer.name}</span>
-                          <span className="text-xs text-muted-foreground">{customer.phone}</span>
+                          {customer.phone && (
+                            <span className="text-xs text-muted-foreground">
+                              {customer.phone}
+                            </span>
+                          )}
                         </div>
                       </CommandItem>
                     ))}
@@ -249,6 +530,10 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
                 </Command>
               </PopoverContent>
             </Popover>
+            <p className="text-xs text-muted-foreground">
+              Se não selecionar cliente, a venda será considerada sem vínculo de
+              cliente.
+            </p>
           </div>
 
           <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
@@ -265,8 +550,10 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
                       className="w-full justify-between"
                     >
                       {currentProduct.id
-                        ? availableProducts.find((p) => p.id === currentProduct.id)?.name
-                        : "Buscar produto..."}
+                        ? availableProducts.find(
+                          (p) => p.id === currentProduct.id,
+                        )?.name
+                        : 'Buscar produto...'}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
@@ -280,26 +567,32 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
                             key={product.id}
                             value={product.name}
                             onSelect={() => {
-                              setCurrentProduct({ 
+                              setCurrentProduct({
                                 ...currentProduct,
-                                id: product.id, 
+                                id: product.id,
                                 name: product.name,
-                                unitPrice: product.price.toString()
+                                unitPrice: product.sale_price.toString(),
                               })
                               setOpenProduct(false)
                             }}
                           >
                             <Check
                               className={cn(
-                                "mr-2 h-4 w-4",
-                                currentProduct.id === product.id ? "opacity-100" : "opacity-0"
+                                'mr-2 h-4 w-4',
+                                currentProduct.id === product.id
+                                  ? 'opacity-100'
+                                  : 'opacity-0',
                               )}
                             />
                             <div className="flex flex-col flex-1">
                               <span>{product.name}</span>
                               <div className="flex gap-2 text-xs text-muted-foreground">
-                                <span>R$ {product.price.toFixed(2)}</span>
-                                <span>• Estoque: {product.stock}</span>
+                                <span>
+                                  R$ {product.sale_price.toFixed(2)}
+                                </span>
+                                <span>
+                                  • Estoque: {product.stock_quantity}
+                                </span>
                               </div>
                             </div>
                           </CommandItem>
@@ -315,18 +608,33 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
                   min="1"
                   placeholder="Qtd"
                   value={currentProduct.quantity}
-                  onChange={(e) => setCurrentProduct({ ...currentProduct, quantity: e.target.value })}
+                  onChange={(e) =>
+                    setCurrentProduct({
+                      ...currentProduct,
+                      quantity: e.target.value,
+                    })
+                  }
                 />
                 <Input
                   type="number"
                   step="0.01"
                   placeholder="Preço"
                   value={currentProduct.unitPrice}
-                  onChange={(e) => setCurrentProduct({ ...currentProduct, unitPrice: e.target.value })}
+                  onChange={(e) =>
+                    setCurrentProduct({
+                      ...currentProduct,
+                      unitPrice: e.target.value,
+                    })
+                  }
                 />
               </div>
             </div>
-            <Button type="button" onClick={handleAddProduct} className="w-full" size="sm">
+            <Button
+              type="button"
+              onClick={handleAddProduct}
+              className="w-full"
+              size="sm"
+            >
               Adicionar Produto
             </Button>
           </div>
@@ -336,11 +644,16 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
               <Label>Produtos Adicionados ({products.length})</Label>
               <div className="rounded-lg border divide-y max-h-[200px] overflow-y-auto">
                 {products.map((product, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-card">
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-card"
+                  >
                     <div className="flex-1">
                       <p className="font-medium text-sm">{product.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {product.quantity}x R$ {product.unitPrice.toFixed(2)} = R$ {product.subtotal.toFixed(2)}
+                        {product.quantity}x R${' '}
+                        {product.unitPrice.toFixed(2)} = R${' '}
+                        {product.subtotal.toFixed(2)}
                       </p>
                     </div>
                     <Button
@@ -366,32 +679,44 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
               max="100"
               step="0.01"
               value={formData.discount}
-              onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, discount: e.target.value })
+              }
             />
           </div>
 
           <div className="rounded-lg bg-muted p-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal</span>
-              <span className="font-medium">R$ {subtotalValue.toFixed(2)}</span>
+              <span className="font-medium">
+                R$ {subtotalValue.toFixed(2)}
+              </span>
             </div>
             {Number(formData.discount) > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Desconto ({formData.discount}%)</span>
-                <span className="font-medium text-emerald-600">- R$ {discountValue.toFixed(2)}</span>
+                <span className="text-muted-foreground">
+                  Desconto ({formData.discount}%)
+                </span>
+                <span className="font-medium text-emerald-600">
+                  - R$ {discountValue.toFixed(2)}
+                </span>
               </div>
             )}
             <div className="flex justify-between pt-2 border-t">
-              <span className="text-sm text-muted-foreground">Valor Total</span>
-              <span className="text-2xl font-bold">R$ {totalValue.toFixed(2)}</span>
+              <span className="text-sm text-muted-foreground">
+                Valor Total
+              </span>
+              <span className="text-2xl font-bold">
+                R$ {totalValue.toFixed(2)}
+              </span>
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="paymentType">Forma de Pagamento</Label>
-              <Select 
-                value={formData.paymentType} 
+              <Select
+                value={formData.paymentType}
                 onValueChange={(value) => {
                   setFormData({ ...formData, paymentType: value })
                   if (value === 'cash') {
@@ -404,14 +729,19 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">À vista</SelectItem>
-                  <SelectItem value="credit">Parcelado (Crediário)</SelectItem>
+                  <SelectItem value="credit">
+                    Parcelado (Crediário)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {formData.paymentType === 'credit' && (
               <div className="space-y-2">
                 <Label htmlFor="installments">Número de Parcelas</Label>
-                <Select value={formData.installments} onValueChange={handleInstallmentsChange}>
+                <Select
+                  value={formData.installments}
+                  onValueChange={handleInstallmentsChange}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -433,38 +763,53 @@ export function SaleDialog({ open, onOpenChange }: SaleDialogProps) {
             )}
           </div>
 
-          {formData.paymentType === 'credit' && installmentDates.length > 0 && (
-            <div className="space-y-3">
-              <Label>Vencimento das Parcelas</Label>
-              <div className="rounded-lg border p-4 space-y-3 max-h-[300px] overflow-y-auto">
-                {installmentDates.map((installment, index) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 flex-1">
-                      <span className="text-sm font-medium min-w-[60px]">
-                        {installment.number}ª parcela
+          {formData.paymentType === 'credit' &&
+            installmentDates.length > 0 && (
+              <div className="space-y-3">
+                <Label>Vencimento das Parcelas</Label>
+                <div className="rounded-lg border p-4 space-y-3 max-h-[300px] overflow-y-auto">
+                  {installmentDates.map((installment, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3"
+                    >
+                      <div className="flex items-center gap-2 flex-1">
+                        <span className="text-sm font-medium min-w-[60px]">
+                          {installment.number}ª parcela
+                        </span>
+                        <Input
+                          type="date"
+                          value={installment.dueDate}
+                          onChange={(e) =>
+                            handleInstallmentDateChange(
+                              index,
+                              e.target.value,
+                            )
+                          }
+                          className="flex-1"
+                          required
+                        />
+                      </div>
+                      <span className="text-sm font-medium min-w-[100px] text-right">
+                        R$ {installment.value.toFixed(2)}
                       </span>
-                      <Input
-                        type="date"
-                        value={installment.dueDate}
-                        onChange={(e) => handleInstallmentDateChange(index, e.target.value)}
-                        className="flex-1"
-                        required
-                      />
                     </div>
-                    <span className="text-sm font-medium min-w-[100px] text-right">
-                      R$ {installment.value.toFixed(2)}
-                    </span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancelar
             </Button>
-            <Button type="submit">Registrar Venda</Button>
+            <Button type="submit" disabled={submitLoading}>
+              {submitLoading ? 'Registrando...' : 'Registrar Venda'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

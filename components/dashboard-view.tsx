@@ -67,7 +67,7 @@ type DateFilter =
 function getDateRange(filter: DateFilter) {
   const now = new Date()
   const year = now.getFullYear()
-  const month = now.getMonth() // 0–11
+  const month = now.getMonth()
 
   let start = new Date()
   let end = new Date()

@@ -1,3 +1,4 @@
+// components/products-view.tsx
 'use client'
 
 import { useState } from 'react'
