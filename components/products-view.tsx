@@ -103,11 +103,6 @@ export function ProductsView() {
   }
 
   const handleDelete = async (product: Product) => {
-    const confirmed = window.confirm(
-      `Deseja realmente desativar o produto "${product.name}"?`,
-    )
-    if (!confirmed) return
-
     try {
       const { error } = await supabase
         .from('products')

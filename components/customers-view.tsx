@@ -208,11 +208,6 @@ export function CustomersView() {
   }
 
   const handleDelete = async (customer: Customer) => {
-    const confirmed = window.confirm(
-      `Deseja realmente excluir o cliente "${customer.name}"?`,
-    )
-    if (!confirmed) return
-
     try {
       const { error } = await supabase
         .from('customers')
