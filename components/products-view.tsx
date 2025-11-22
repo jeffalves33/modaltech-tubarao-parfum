@@ -10,12 +10,20 @@ import {
   Search,
   Pencil,
   Trash2,
+  Filter,
   Package,
   DollarSign,
   TrendingUp,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { ProductDialog } from '@/components/product-dialog'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -35,6 +43,14 @@ export function ProductsView() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+  const [filterStock, setFilterStock] = useState<
+    'all' | 'in_stock' | 'low_stock' | 'out_of_stock'
+  >('all')
+
+  const [sortBy, setSortBy] = useState<
+    'name' | 'brand' | 'stock' | 'salePrice'
+  >('name')
+
 
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(false)
@@ -76,21 +92,57 @@ export function ProductsView() {
     loadProducts()
   }, [])
 
-  const filteredProducts = products.filter(
+  // busca por nome ou marca
+  let filteredProducts = products.filter(
     (p) =>
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.brand.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
+  // filtro por estoque
+  if (filterStock !== 'all') {
+    filteredProducts = filteredProducts.filter((p) => {
+      if (filterStock === 'in_stock') return p.stock > 0
+      if (filterStock === 'low_stock') return p.stock > 0 && p.stock <= 5
+      if (filterStock === 'out_of_stock') return p.stock === 0
+      return true
+    })
+  }
+
+  // ordenação
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    switch (sortBy) {
+      case 'name':
+        return a.name.localeCompare(b.name)
+      case 'brand':
+        return a.brand.localeCompare(b.brand)
+      case 'stock':
+        return b.stock - a.stock
+      case 'salePrice':
+        return b.salePrice - a.salePrice
+      default:
+        return 0
+    }
+  })
+
   const totalStock = products.reduce((sum, p) => sum + p.stock, 0)
-  const totalStockValue = products.reduce((sum, p) => sum + p.salePrice * p.stock, 0)
-  const totalInvestedValue = products.reduce((sum, p) => sum + p.costPrice * p.stock, 0)
+  const totalStockValue = products.reduce(
+    (sum, p) => sum + p.salePrice * p.stock,
+    0,
+  )
+  const totalInvestedValue = products.reduce(
+    (sum, p) => sum + p.costPrice * p.stock,
+    0,
+  )
   const potentialProfit = totalStockValue - totalInvestedValue
 
-  const totalPages = Math.max(Math.ceil(filteredProducts.length / itemsPerPage), 1)
+  const totalPages = Math.max(
+    Math.ceil(sortedProducts.length / itemsPerPage),
+    1,
+  )
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const paginatedProducts = filteredProducts.slice(startIndex, endIndex)
+  const paginatedProducts = sortedProducts.slice(startIndex, endIndex)
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product)
@@ -187,7 +239,7 @@ export function ProductsView() {
 
       <Card>
         <CardHeader>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {error && (
               <p className="text-sm text-destructive">{error}</p>
             )}
@@ -196,6 +248,7 @@ export function ProductsView() {
                 Carregando produtos...
               </p>
             )}
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -207,6 +260,47 @@ export function ProductsView() {
                   setCurrentPage(1)
                 }}
               />
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Select
+                value={filterStock}
+                onValueChange={(value) => {
+                  setFilterStock(value as any)
+                  setCurrentPage(1)
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <Filter className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Filtrar por..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os produtos</SelectItem>
+                  <SelectItem value="in_stock">Com estoque</SelectItem>
+                  <SelectItem value="low_stock">Estoque baixo (≤ 5)</SelectItem>
+                  <SelectItem value="out_of_stock">Sem estoque</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={sortBy}
+                onValueChange={(value) => {
+                  setSortBy(value as any)
+                  setCurrentPage(1)
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-[220px]">
+                  <SelectValue placeholder="Ordenar por" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Nome (A–Z)</SelectItem>
+                  <SelectItem value="brand">Marca (A–Z)</SelectItem>
+                  <SelectItem value="stock">Estoque (maior → menor)</SelectItem>
+                  <SelectItem value="salePrice">
+                    Preço venda (maior → menor)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardHeader>
@@ -284,8 +378,8 @@ export function ProductsView() {
             <div className="flex items-center justify-between pt-4 border-t mt-4">
               <p className="text-sm text-muted-foreground">
                 Mostrando {startIndex + 1} a{' '}
-                {Math.min(endIndex, filteredProducts.length)} de{' '}
-                {filteredProducts.length} produtos
+                {Math.min(endIndex, sortedProducts.length)} de{' '}
+                {sortedProducts.length} produtos
               </p>
               <div className="flex gap-2">
                 <Button
