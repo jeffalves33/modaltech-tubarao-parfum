@@ -11,9 +11,17 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
+  MoreVertical,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { PaymentDialog } from '@/components/payment-dialog'
+import { ReceivableDetailsDialog } from '@/components/receivable-details-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Select,
   SelectContent,
@@ -43,6 +51,7 @@ export function ReceivablesView() {
   const [selectedReceivable, setSelectedReceivable] =
     useState<Receivable | null>(null)
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false)
 
   const [filterStatus, setFilterStatus] =
     useState<'all' | ReceivableStatus>('all')
@@ -279,6 +288,11 @@ export function ReceivablesView() {
     setIsPaymentDialogOpen(true)
   }
 
+  const handleViewDetails = (receivable: Receivable) => {
+    setSelectedReceivable(receivable)
+    setIsDetailsOpen(true)
+  }
+
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -424,14 +438,26 @@ export function ReceivablesView() {
                     </td>
                     <td className="py-4">
                       <div className="flex justify-end">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleMarkAsPaid(receivable)}
-                          disabled={receivable.outstanding <= 0}
-                        >
-                          Marcar como Pago
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleViewDetails(receivable)}
+                            >
+                              Ver detalhes
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleMarkAsPaid(receivable)}
+                              disabled={receivable.outstanding <= 0}
+                            >
+                              Marcar como pago
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </td>
                   </tr>
@@ -523,6 +549,14 @@ export function ReceivablesView() {
           if (!open) setSelectedReceivable(null)
         }}
         onPaid={loadReceivables}
+      />
+      <ReceivableDetailsDialog
+        receivable={selectedReceivable}
+        open={isDetailsOpen}
+        onOpenChange={(open) => {
+          setIsDetailsOpen(open)
+          if (!open) setSelectedReceivable(null)
+        }}
       />
     </div>
   )
