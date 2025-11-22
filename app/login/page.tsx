@@ -52,11 +52,15 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-4 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-primary">
-            <Droplet className="h-8 w-8 text-primary-foreground" />
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-primary rounded-lg text-primary-foreground overflow-hidden">
+            <img
+              src="/icon.jpg"
+              alt="Logo"
+              className="object-cover"
+            />
           </div>
           <div>
-            <CardTitle className="text-2xl">Perfume Sales</CardTitle>
+            <CardTitle className="text-2xl">Tubarão Perfum</CardTitle>
             <CardDescription>Entre com suas credenciais</CardDescription>
           </div>
         </CardHeader>

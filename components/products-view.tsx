@@ -165,7 +165,7 @@ export function ProductsView() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              R$ {totalStockValue.toFixed(2)}
+              R$ {totalInvestedValue.toFixed(2)}
             </div>
           </CardContent>
         </Card>

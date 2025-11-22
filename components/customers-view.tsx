@@ -335,9 +335,11 @@ export function CustomersView() {
                         <Phone className="h-3.5 w-3.5" />
                         {customer.phone && customer.phone.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3')}
                       </div>
-                      <div>
-                        CPF: {customer.cpf && customer.cpf.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4')}
-                      </div>
+                      {customer.cpf && (
+                        <div>
+                          CPF: {customer.cpf.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4')}
+                        </div>
+                      )}
                     </div>
                   </div>
 

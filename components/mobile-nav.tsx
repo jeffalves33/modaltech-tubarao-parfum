@@ -1,3 +1,4 @@
+// components/mobile-nav.tsx
 'use client'
 
 import { Menu, Package, LogOut } from 'lucide-react'
@@ -9,6 +10,7 @@ import {
 } from '@/components/ui/sheet'
 import { LayoutDashboard, Users, ShoppingCart, Receipt, DollarSign } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabaseClient'
 
 interface MobileNavProps {
   currentView: string
@@ -25,10 +27,20 @@ export function MobileNav({ currentView, onViewChange }: MobileNavProps) {
     { id: 'expenses', label: 'Despesas', icon: DollarSign },
   ]
 
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated')
-    localStorage.removeItem('userEmail')
-    window.location.href = '/login'
+  const handleLogout = async () => {
+    try {
+      // encerra a sessão do Supabase (remove cookie)
+      await supabase.auth.signOut()
+    } catch (error) {
+      console.error('Erro ao deslogar do Supabase', error)
+    } finally {
+      // se você ainda quiser limpar qualquer lixo antigo no localStorage:
+      localStorage.removeItem('isAuthenticated')
+      localStorage.removeItem('userEmail')
+
+      // redireciona para login
+      window.location.href = '/login'
+    }
   }
 
   return (
