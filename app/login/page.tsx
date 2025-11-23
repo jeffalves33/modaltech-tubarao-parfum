@@ -60,7 +60,7 @@ function LoginPageInner() {
             />
           </div>
           <div>
-            <CardTitle className="text-2xl">Tubarão Perfum</CardTitle>
+            <CardTitle className="text-2xl">Tubarão Parfum</CardTitle>
             <CardDescription>Entre com suas credenciais</CardDescription>
           </div>
         </CardHeader>
