@@ -1,15 +1,15 @@
 'use client'
 
+import { Suspense } from 'react'
 import { FormEvent, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Droplet } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('from') || '/'
@@ -19,7 +19,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
 
@@ -91,20 +91,32 @@ export default function LoginPage() {
               />
             </div>
 
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
+            {error && <p className="text-sm text-destructive">{error}</p>}
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Entrando...' : 'Entrar'}
             </Button>
 
             <p className="text-xs text-muted-foreground mt-2">
-              O acesso é restrito. O usuário é criado diretamente pelo Desenvolvedor.
+              O acesso é restrito. O usuário é criado diretamente pelo desenvolvedor.
             </p>
           </form>
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
+          Carregando página de login...
+        </div>
+      }
+    >
+      <LoginPageInner />
+    </Suspense>
   )
 }
