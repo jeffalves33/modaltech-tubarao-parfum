@@ -103,7 +103,7 @@ export function ProductsView() {
   if (filterStock !== 'all') {
     filteredProducts = filteredProducts.filter((p) => {
       if (filterStock === 'in_stock') return p.stock > 0
-      if (filterStock === 'low_stock') return p.stock > 0 && p.stock <= 5
+      if (filterStock === 'low_stock') return p.stock > 0 && p.stock <= 3
       if (filterStock === 'out_of_stock') return p.stock === 0
       return true
     })
@@ -277,7 +277,7 @@ export function ProductsView() {
                 <SelectContent>
                   <SelectItem value="all">Todos os produtos</SelectItem>
                   <SelectItem value="in_stock">Com estoque</SelectItem>
-                  <SelectItem value="low_stock">Estoque baixo (≤ 5)</SelectItem>
+                  <SelectItem value="low_stock">Estoque baixo (≤ 3)</SelectItem>
                   <SelectItem value="out_of_stock">Sem estoque</SelectItem>
                 </SelectContent>
               </Select>
@@ -331,7 +331,7 @@ export function ProductsView() {
                     <td className="py-4 text-right">
                       <span
                         className={
-                          product.stock <= 5
+                          product.stock <= 3
                             ? 'text-destructive font-medium'
                             : ''
                         }
