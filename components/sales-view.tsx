@@ -27,7 +27,7 @@ interface Sale {
   paymentType: 'cash' | 'credit'
   installments?: number
   paidAmount: number
-  status: 'paid' | 'pending' | 'partial'
+  status: 'paid' | 'pending' | 'partial' | 'canceled'
 }
 
 export function SalesView() {
@@ -53,7 +53,7 @@ export function SalesView() {
         await Promise.all([
           supabase
             .from('sales')
-            .select('id, sale_date, total_amount, customer_id')
+            .select('id, sale_date, total_amount, customer_id, status')
             .order('sale_date', { ascending: false }),
           supabase.from('customers').select('id, name'),
           supabase.from('sale_items').select('sale_id, product_id, quantity, subtotal'),
@@ -74,6 +74,7 @@ export function SalesView() {
         sale_date: string
         total_amount: number | string | null
         customer_id: string | null
+        status: string | null
       }[]
 
       const customers = (customersRes.data ?? []) as { id: string; name: string }[]
@@ -150,9 +151,11 @@ export function SalesView() {
             : totalValue
 
         const outstanding = totalReceivable - paidAmount
+        const dbStatus = s.status ?? 'open'
 
         let status: Sale['status']
-        if (outstanding <= 0) status = 'paid'
+        if (dbStatus === 'canceled') status = 'canceled'
+        else if (outstanding <= 0) status = 'paid'
         else if (paidAmount > 0) status = 'partial'
         else status = 'pending'
 
@@ -224,6 +227,11 @@ export function SalesView() {
         variant: 'outline' as const,
         className: 'border-amber-500 text-amber-700',
       },
+      canceled: {
+        label: 'Cancelado',
+        variant: 'outline' as const,
+        className: 'border-destructive text-destructive',
+      },
     }
     const config = variants[status]
     return (
@@ -236,6 +244,24 @@ export function SalesView() {
   const handleViewDetails = (sale: Sale) => {
     setSelectedSale(sale)
     setIsDetailsOpen(true)
+  }
+
+  const handleCancelSale = async (sale: Sale) => {
+    try {
+      const { error } = await supabase.rpc('cancel_sale', { p_sale_id: sale.id, })
+
+      if (error) {
+        console.error('Erro ao cancelar venda', error)
+        setError('Erro ao cancelar venda. Tente novamente.')
+        return
+      }
+
+      // recarrega a lista de vendas
+      await loadSales()
+    } catch (err: any) {
+      console.error('Erro ao cancelar venda', err)
+      setError('Erro ao cancelar venda. Tente novamente.')
+    }
   }
 
   return (
@@ -285,6 +311,7 @@ export function SalesView() {
                   <SelectItem value="paid">Pago</SelectItem>
                   <SelectItem value="pending">Pendente</SelectItem>
                   <SelectItem value="partial">Parcial</SelectItem>
+                  <SelectItem value="canceled">Cancelado</SelectItem>
                 </SelectContent>
               </Select>
               <Select
@@ -344,10 +371,14 @@ export function SalesView() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleViewDetails(sale)}
-                            >
+                            <DropdownMenuItem onClick={() => handleViewDetails(sale)}>
                               Ver Detalhes
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleCancelSale(sale)}
+                              disabled={sale.status === 'canceled'}
+                            >
+                              Cancelar venda
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

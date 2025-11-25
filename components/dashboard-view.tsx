@@ -200,6 +200,7 @@ export function DashboardView() {
           supabase
             .from('sales')
             .select('id, sale_date, total_amount, customer_id, status')
+            .neq('status', 'canceled')
             .gte('sale_date', startIso)
             .lt('sale_date', endIso),
 

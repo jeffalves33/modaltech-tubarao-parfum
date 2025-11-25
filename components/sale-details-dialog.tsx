@@ -15,7 +15,7 @@ interface Sale {
   paymentType: 'cash' | 'credit'
   installments?: number
   paidAmount: number
-  status: 'paid' | 'pending' | 'partial'
+  status: 'paid' | 'pending' | 'partial' | 'canceled'
 }
 
 interface SaleDetailsDialogProps {
@@ -134,6 +134,10 @@ export function SaleDetailsDialog({ sale, open, onOpenChange }: SaleDetailsDialo
       paid: { label: 'Pago', className: 'bg-emerald-500 text-white' },
       pending: { label: 'Pendente', className: 'bg-amber-500 text-white' },
       partial: { label: 'Parcial', className: 'border-amber-500 text-amber-700' },
+      canceled: {
+        label: 'Cancelado',
+        className: 'border-destructive text-destructive',
+      },
     }
     const config = variants[status]
     return <Badge className={config.className}>{config.label}</Badge>
