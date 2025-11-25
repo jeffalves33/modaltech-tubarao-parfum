@@ -1,7 +1,7 @@
 // components/payment-dialog.tsx
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { supabase } from '@/lib/supabaseClient'
@@ -36,57 +37,73 @@ interface PaymentDialogProps {
   onPaid?: () => void
 }
 
-export function PaymentDialog({
-  receivable,
-  open,
-  onOpenChange,
-  onPaid,
-}: PaymentDialogProps) {
-  const [paymentOption, setPaymentOption] = useState<'single' | 'multiple'>(
-    'single',
-  )
+export function PaymentDialog({ receivable, open, onOpenChange, onPaid, }: PaymentDialogProps) {
+  const [paymentMode, setPaymentMode] = useState<'total' | 'partial'>('total')
+  const [amount, setAmount] = useState('')
+  const [paymentDate, setPaymentDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (open && receivable) {
+      setPaymentMode('total')
+      setAmount(receivable.outstanding.toFixed(2))
+      setPaymentDate(new Date().toISOString().slice(0, 10))
+      setError(null)
+    }
+  }, [open, receivable])
 
   if (!receivable) return null
 
   const handleConfirm = async () => {
+    if (!receivable) return
+
     if (receivable.outstanding <= 0) {
       onOpenChange(false)
       return
     }
 
+    // valor digitado (ou total em aberto, se modo "total")
+    const valueStr = paymentMode === 'total' ? receivable.outstanding.toFixed(2) : amount
+    const normalized = valueStr.trim().replace(',', '.')
+    const value = Number(normalized)
+
+    if (!Number.isFinite(value) || value <= 0) {
+      setError('Informe um valor de pagamento válido.')
+      return
+    }
+
+    // não deixar pagar mais que o saldo em aberto desta parcela
+    if (value - receivable.outstanding > 0.01) {
+      setError('O valor pago não pode ser maior que o saldo em aberto desta parcela.')
+      return
+    }
+
+    const dateToUse = paymentDate && paymentDate.length > 0 ? paymentDate : new Date().toISOString().slice(0, 10)
+
     setLoading(true)
     setError(null)
 
     try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-
-      if (userError) throw userError
-
-      const userId = user?.id ?? null
-      const today = new Date().toISOString().slice(0, 10)
-      const amountToPay = receivable.outstanding
-
-      // 1) registra pagamento nessa parcela
+      // 1) cria um registro em payments para ESTA parcela
       const { error: payError } = await supabase.from('payments').insert({
-        receivable_id: receivable.id,
         sale_id: receivable.saleId,
+        receivable_id: receivable.id,
         customer_id: receivable.customerId,
-        amount: amountToPay,
-        method: 'transfer',
-        payment_date: today,
+        amount: value,
+        method: 'cash',
+        payment_date: dateToUse,
       })
 
       if (payError) throw payError
 
-      // 2) marca parcela como paga
+      // 2) atualiza status da parcela com base no novo saldo
+      const newOutstanding = Math.max(receivable.outstanding - value, 0)
+      const newStatus: ReceivableStatus = newOutstanding <= 0 ? 'paid' : 'partial'
+
       const { error: recError } = await supabase
         .from('receivables')
-        .update({ status: 'paid' })
+        .update({ status: newStatus })
         .eq('id', receivable.id)
 
       if (recError) throw recError
@@ -115,7 +132,15 @@ export function PaymentDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setError(null)
+        }
+        onOpenChange(isOpen)
+      }}
+    >
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
           <DialogTitle>Confirmar Pagamento</DialogTitle>
@@ -154,24 +179,60 @@ export function PaymentDialog({
           </div>
 
           <div className="space-y-3">
-            <Label>Opção de Pagamento</Label>
+            <Label>Opção de pagamento</Label>
             <RadioGroup
-              value={paymentOption}
-              onValueChange={(v) => setPaymentOption(v as 'single' | 'multiple')}
+              value={paymentMode}
+              onValueChange={(v) => {
+                const mode = v as 'total' | 'partial'
+                setPaymentMode(mode)
+                if (mode === 'total') {
+                  setAmount(receivable.outstanding.toFixed(2))
+                } else {
+                  setAmount('')
+                }
+              }}
             >
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="single" id="single" />
-                <Label htmlFor="single" className="font-normal">
-                  Pagar parcela total
+                <RadioGroupItem value="total" id="pay-total" />
+                <Label htmlFor="pay-total" className="font-normal">
+                  Pagar valor total em aberto
                 </Label>
               </div>
-              <div className="flex items-center space-x-2 opacity-60">
-                <RadioGroupItem value="partial" id="partial" disabled />
-                <Label htmlFor="partial" className="font-normal">
-                  Pagar parcela parcial
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="partial" id="pay-partial" />
+                <Label htmlFor="pay-partial" className="font-normal">
+                  Registrar pagamento parcial
                 </Label>
               </div>
             </RadioGroup>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="payment-amount">
+                Valor a pagar
+              </Label>
+              <Input
+                id="payment-amount"
+                type="number"
+                step="0.01"
+                min="0"
+                value={amount}
+                disabled={paymentMode === 'total'}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="payment-date">
+                Data do pagamento
+              </Label>
+              <Input
+                id="payment-date"
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+              />
+            </div>
           </div>
 
           {error && (
