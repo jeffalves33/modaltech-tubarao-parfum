@@ -6,6 +6,16 @@ export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
     const isAuthRoute = pathname.startsWith('/login')
 
+    if (
+        pathname === '/manifest.webmanifest' ||
+        pathname === '/sw.js' ||
+        pathname === '/favicon.ico' ||
+        pathname.startsWith('/icon_modaltech') ||
+        pathname.startsWith('/_next')
+    ) {
+        return NextResponse.next()
+    }
+
     let response = NextResponse.next({
         request: {
             headers: request.headers,
