@@ -162,15 +162,15 @@ export function PaymentDialog({
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="single" id="single" />
                 <Label htmlFor="single" className="font-normal">
-                  Pagar esta parcela por completo
+                  Pagar parcela total
                 </Label>
               </div>
-              {/*<div className="flex items-center space-x-2 opacity-60">
-                <RadioGroupItem value="multiple" id="multiple" disabled />
-                <Label htmlFor="multiple" className="font-normal">
-                  Pagar múltiplas parcelas (em breve)
+              <div className="flex items-center space-x-2 opacity-60">
+                <RadioGroupItem value="partial" id="partial" disabled />
+                <Label htmlFor="partial" className="font-normal">
+                  Pagar parcela parcial
                 </Label>
-              </div>*/}
+              </div>
             </RadioGroup>
           </div>
 

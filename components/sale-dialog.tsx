@@ -213,7 +213,7 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
       const dueDate = new Date(today.getFullYear(), today.getMonth() + i + 1, 1)
       newInstallments.push({
         number: i + 1,
-        value: installmentValue,
+        value: Number(installmentValue.toFixed(2)),
         dueDate: dueDate.toISOString().split('T')[0],
       })
     }
@@ -224,6 +224,13 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
   const handleInstallmentDateChange = (index: number, date: string) => {
     const updated = [...installmentDates]
     updated[index].dueDate = date
+    setInstallmentDates(updated)
+  }
+
+  const handleInstallmentValueChange = (index: number, value: string) => {
+    const numeric = Number(value.replace(',', '.'))
+    const updated = [...installmentDates]
+    updated[index].value = Number.isFinite(numeric) ? numeric : 0
     setInstallmentDates(updated)
   }
 
@@ -251,6 +258,34 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
       const currentSubtotal = products.reduce((sum, p) => sum + p.subtotal, 0)
       const currentDiscountValue = currentSubtotal * (discountPercent / 100)
       const currentTotalValue = currentSubtotal - currentDiscountValue
+
+      if (formData.paymentType === 'credit') {
+        if (installmentDates.length === 0) {
+          setSubmitLoading(false)
+          setError(
+            'Defina as parcelas (valor e vencimento) antes de salvar uma venda parcelada.',
+          )
+          return
+        }
+
+        const sumInstallments = installmentDates.reduce(
+          (sum, inst) => sum + (inst.value || 0),
+          0,
+        )
+
+        // tolerância de 1 centavo por causa de arredondamento
+        if (Math.abs(sumInstallments - currentTotalValue) > 0.01) {
+          setSubmitLoading(false)
+          setError(
+            `A soma das parcelas (R$ ${sumInstallments.toFixed(
+              2,
+            )}) é diferente do valor total da venda (R$ ${currentTotalValue.toFixed(
+              2,
+            )}). Ajuste os valores das parcelas.`,
+          )
+          return
+        }
+      }
 
       // 1) Cria a venda (sales)
       const { data: saleInsert, error: saleError } = await supabase
@@ -312,9 +347,9 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
         const receivablesPayload = installmentDates.map((inst) => ({
           sale_id: saleId,
           customer_id: formData.customer || null,
-          installment_number: inst.number,
-          due_date: inst.dueDate,
           amount: inst.value,
+          due_date: inst.dueDate,
+          installment_number: inst.number,
           status: 'open',
         }))
 
@@ -431,14 +466,14 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
             </div>
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button
+            {/*<Button
               variant="outline"
               onClick={handlePrint}
               className="gap-2 w-full sm:w-auto"
             >
               <Printer className="h-4 w-4" />
               Imprimir
-            </Button>
+            </Button>*/}
             <Button
               variant="outline"
               onClick={handleSendWhatsApp}
@@ -771,7 +806,7 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
                   {installmentDates.map((installment, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-3"
+                      className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3"
                     >
                       <div className="flex items-center gap-2 flex-1">
                         <span className="text-sm font-medium min-w-[60px]">
@@ -781,18 +816,29 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
                           type="date"
                           value={installment.dueDate}
                           onChange={(e) =>
-                            handleInstallmentDateChange(
-                              index,
-                              e.target.value,
-                            )
+                            handleInstallmentDateChange(index, e.target.value)
                           }
                           className="flex-1"
                           required
                         />
                       </div>
-                      <span className="text-sm font-medium min-w-[100px] text-right">
-                        R$ {installment.value.toFixed(2)}
-                      </span>
+
+                      <div className="flex items-center gap-2 sm:w-[160px]">
+                        <span className="text-xs text-muted-foreground">
+                          Valor
+                        </span>
+                        <Input
+                          type="number"
+                          step="1"
+                          min="0"
+                          value={installment.value.toFixed(2)}
+                          onChange={(e) =>
+                            handleInstallmentValueChange(index, e.target.value)
+                          }
+                          className="text-right"
+                          required
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
