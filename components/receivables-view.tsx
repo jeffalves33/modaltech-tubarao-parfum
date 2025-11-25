@@ -300,11 +300,11 @@ export function ReceivablesView() {
     }).format(value || 0)
 
   const formatDate = (dateStr: string) => {
-    if (!dateStr) return ''
-    const d = new Date(dateStr)
-    if (Number.isNaN(d.getTime())) return dateStr
-    return d.toLocaleDateString('pt-BR')
-  }
+  if (!dateStr) return ''
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const d = new Date(year, month - 1, day)
+  return d.toLocaleDateString('pt-BR')
+}
 
   return (
     <div className="space-y-6">

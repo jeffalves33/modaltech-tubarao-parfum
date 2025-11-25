@@ -3,12 +3,14 @@
 
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { TrendingUp, TrendingDown, DollarSign, Users, Package, ShoppingCart } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { supabase } from '@/lib/supabaseClient'
 
 type SummaryStats = {
   salesTotal: number
+  receivedTotal: number
   receivablesOpen: number
   stockUnits: number
   activeCustomers: number
@@ -63,6 +65,7 @@ type DateFilter =
   | 'current-quarter'
   | 'current-year'
   | 'all-time'
+  | 'custom'
 
 function getDateRange(filter: DateFilter) {
   const now = new Date()
@@ -119,10 +122,29 @@ function getDateRange(filter: DateFilter) {
   }
 }
 
+function getCustomDateRange(startStr: string, endStr: string) {
+  const start = new Date(startStr + 'T00:00:00')
+  const end = new Date(endStr + 'T00:00:00')
+
+  // usamos end exclusivo, então soma 1 dia
+  end.setDate(end.getDate() + 1)
+
+  return {
+    start,
+    end,
+    startIso: start.toISOString(),
+    endIso: end.toISOString(),
+    startDate: startStr,
+    endDate: end.toISOString().slice(0, 10),
+  }
+}
+
 // ----------------- componente principal -----------------
 
 export function DashboardView() {
   const [dateFilter, setDateFilter] = useState<DateFilter>('current-month')
+  const [customStartDate, setCustomStartDate] = useState<string | null>(null)
+  const [customEndDate, setCustomEndDate] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -139,7 +161,30 @@ export function DashboardView() {
       setError(null)
 
       try {
-        const { startIso, endIso, startDate, endDate } = getDateRange(dateFilter)
+        let range: {
+          startIso: string
+          endIso: string
+          startDate: string
+          endDate: string
+        }
+
+        if (dateFilter === 'custom') {
+          // se ainda não escolheu as duas datas, não carrega nada
+          if (!customStartDate || !customEndDate) {
+            setSummary(null)
+            setFinancialState(null)
+            setRecentSales([])
+            setUpcomingReceivables([])
+            setLoading(false)
+            return
+          }
+
+          range = getCustomDateRange(customStartDate, customEndDate)
+        } else {
+          range = getDateRange(dateFilter)
+        }
+
+        const { startIso, endIso, startDate, endDate } = range
 
         // 1) carrega dados em paralelo
         const [
@@ -351,7 +396,7 @@ export function DashboardView() {
             new Date(b.sale_date).getTime() - new Date(a.sale_date).getTime(),
         )
 
-        const recentSalesList: RecentSale[] = recentSalesSorted.slice(0, 5).map((s) => {
+        const recentSalesList = recentSalesSorted.slice(0, 5).map((s) => {
           const hasReceivables = receivables.some((r) => r.sale_id === s.id)
           const customerName =
             (s.customer_id && customerMap[s.customer_id]) || 'Cliente não identificado'
@@ -373,36 +418,35 @@ export function DashboardView() {
           .filter((r) => r.due_date >= todayStr)
           .sort((a, b) => a.due_date.localeCompare(b.due_date))
 
-        const upcomingList: UpcomingReceivable[] = receivablesUpcoming
-          .slice(0, 5)
-          .map((r) => {
-            const customerName =
-              (r.customer_id && customerMap[r.customer_id]) || 'Cliente não identificado'
+        const upcomingList = receivablesUpcoming.slice(0, 5).map((r) => {
+          const customerName =
+            (r.customer_id && customerMap[r.customer_id]) || 'Cliente não identificado'
 
-            const totalInstallments = Math.max(
-              ...receivables
-                .filter((x) => x.sale_id === r.sale_id)
-                .map((x) => x.installment_number),
-            )
+          const totalInstallments = Math.max(
+            ...receivables
+              .filter((x) => x.sale_id === r.sale_id)
+              .map((x) => x.installment_number),
+          )
 
-            const outstanding = outstandingByReceivable[r.id] ?? r.amount ?? 0
+          const outstanding = outstandingByReceivable[r.id] ?? r.amount ?? 0
 
-            return {
-              id: r.id,
-              customerName,
-              dueDate: r.due_date,
-              amount: outstanding,
-              installmentLabel:
-                totalInstallments > 0
-                  ? `${r.installment_number}/${totalInstallments}`
-                  : `${r.installment_number}`,
-            }
-          })
+          return {
+            id: r.id,
+            customerName,
+            dueDate: r.due_date,
+            amount: outstanding,
+            installmentLabel:
+              totalInstallments > 0
+                ? `${r.installment_number}/${totalInstallments}`
+                : `${r.installment_number}`,
+          }
+        })
 
         if (cancelled) return
 
         setSummary({
           salesTotal,
+          receivedTotal: totalReceived,
           receivablesOpen: totalReceivablesOpen,
           stockUnits,
           activeCustomers,
@@ -433,7 +477,7 @@ export function DashboardView() {
     return () => {
       cancelled = true
     }
-  }, [dateFilter])
+  }, [dateFilter, customStartDate, customEndDate])
 
   const stats = summary
     ? [
@@ -441,13 +485,19 @@ export function DashboardView() {
         title: 'Vendas do Período',
         value: formatCurrency(summary.salesTotal),
         icon: ShoppingCart,
-        description: 'Total de vendas no período selecionado',
+        description: 'Total de vendas',
       },
       {
-        title: 'A Receber',
+        title: 'Recebido no Período',
+        value: formatCurrency(summary.receivedTotal),
+        icon: TrendingUp,
+        description: 'Pagamentos recebidos',
+      },
+      {
+        title: 'A Receber no período',
         value: formatCurrency(summary.receivablesOpen),
         icon: DollarSign,
-        description: 'Parcelas em aberto ou parciais no período',
+        description: 'Parcelas em aberto',
       },
       {
         title: 'Estoque',
@@ -465,6 +515,20 @@ export function DashboardView() {
     : []
 
   const financial = financialMetricsFallback(financialState)
+  const breakEvenStatusLabel =
+    financial.breakEven <= 0
+      ? 'Sem ponto de equilíbrio definido'
+      : financial.grossProfit >= financial.breakEven
+        ? 'Acima do Break-even'
+        : 'Abaixo do Break-even'
+
+  const breakEvenStatusClass =
+    financial.breakEven <= 0
+      ? 'text-muted-foreground'
+      : financial.grossProfit >= financial.breakEven
+        ? 'text-emerald-600'
+        : 'text-red-600'
+
 
   return (
     <div className="space-y-8">
@@ -487,9 +551,33 @@ export function DashboardView() {
             <SelectItem value="current-quarter">Trimestre Atual</SelectItem>
             <SelectItem value="current-year">Ano Atual</SelectItem>
             <SelectItem value="all-time">Todo Período</SelectItem>
+            <SelectItem value="custom">Período Personalizado</SelectItem>
           </SelectContent>
         </Select>
       </div>
+
+      {dateFilter === 'custom' && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">De</span>
+            <Input
+              type="date"
+              value={customStartDate ?? ''}
+              onChange={(e) => setCustomStartDate(e.target.value || null)}
+              className="w-[180px]"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Até</span>
+            <Input
+              type="date"
+              value={customEndDate ?? ''}
+              onChange={(e) => setCustomEndDate(e.target.value || null)}
+              className="w-[180px]"
+            />
+          </div>
+        </div>
+      )}
 
       {loading && (
         <p className="text-sm text-muted-foreground">Carregando dados do dashboard...</p>
@@ -508,7 +596,7 @@ export function DashboardView() {
 
       {!loading && !error && (
         <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             {stats.map((stat) => {
               const Icon = stat.icon
               return (
@@ -520,7 +608,7 @@ export function DashboardView() {
                     <Icon className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{stat.value}</div>
+                    <div className="text-base sm:text-2xl font-bold leading-tight break-words">{stat.value}</div>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {stat.description}
                     </p>
@@ -538,27 +626,19 @@ export function DashboardView() {
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">Receita Total</p>
-                  <p className="text-2xl font-bold">
-                    {formatCurrency(financial.totalRevenue)}
-                  </p>
+                  <p className="text-xl sm:text-2xl font-bold leading-tight break-words">{formatCurrency(financial.totalRevenue)}</p>
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">Custos Totais</p>
-                  <p className="text-2xl font-bold text-red-600">
-                    {formatCurrency(financial.totalCosts)}
-                  </p>
+                  <p className="text-xl sm:text-2xl font-bold leading-tight break-words text-red-600">{formatCurrency(financial.totalCosts)}</p>
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">Lucro Bruto</p>
-                  <p className="text-2xl font-bold text-emerald-600">
-                    {formatCurrency(financial.grossProfit)}
-                  </p>
+                  <p className="text-xl sm:text-2xl font-bold leading-tight break-words text-emerald-600">{formatCurrency(financial.grossProfit)}</p>
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">Margem de Lucro</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {financial.marginPercent.toFixed(1)}%
-                  </p>
+                  <p className="text-xl sm:text-2xl font-bold leading-tight break-words text-blue-600">{financial.marginPercent.toFixed(1)}%</p>
                 </div>
               </div>
               <div className="mt-6 rounded-lg border bg-muted/50 p-4">
@@ -573,15 +653,8 @@ export function DashboardView() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Status</p>
-                    <p
-                      className={`text-lg font-semibold ${financial.grossProfit >= 0
-                        ? 'text-emerald-600'
-                        : 'text-red-600'
-                        }`}
-                    >
-                      {financial.grossProfit >= 0
-                        ? 'Acima do Break-even'
-                        : 'Abaixo do Break-even'}
+                    <p className={`text-lg font-semibold ${breakEvenStatusClass}`}>
+                      {breakEvenStatusLabel}
                     </p>
                   </div>
                 </div>
