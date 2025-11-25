@@ -1,3 +1,5 @@
+// app/layout.tsx
+
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
@@ -11,7 +13,6 @@ export const metadata: Metadata = {
   title: 'Modaltech - Tubarão Parfum',
   description: 'Sistema completo de gestão de vendas de perfumes',
   generator: 'Modaltech',
-  manifest: '/manifest.webmanifest',
   themeColor: '#ffffff',
   icons: {
     icon: [
