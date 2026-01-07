@@ -4,7 +4,7 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
     return {
-        name: 'Modaltech - Tubarão Parfum',
+        name: 'Modaltech',
         short_name: 'Modaltech',
         start_url: '/',
         scope: '/',

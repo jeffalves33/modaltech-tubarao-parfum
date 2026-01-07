@@ -61,7 +61,7 @@ export function MobileNav({ currentView, onViewChange }: MobileNavProps) {
                   className="object-cover"
                 />
               </div>
-              <span className="text-lg font-semibold">Tubarão Parfum</span>
+              <span className="text-lg font-semibold">Angel Cosméticos</span>
             </div>
           </div>
           <nav className="flex flex-1 flex-col p-6">
@@ -104,7 +104,7 @@ export function MobileNav({ currentView, onViewChange }: MobileNavProps) {
             className="object-cover"
           />
         </div>
-        <span className="text-lg font-semibold">Tubarão Parfum</span>
+        <span className="text-lg font-semibold">Angel Cosméticos</span>
       </div>
     </div>
   )

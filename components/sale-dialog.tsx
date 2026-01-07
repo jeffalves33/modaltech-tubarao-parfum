@@ -410,7 +410,7 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
       )
       .join('\n')
 
-    const message = `*Comprovante de Venda - Tubarão Parfum*\n\nCliente: ${customer.name
+    const message = `*Comprovante de Venda - Angel Cosméticos*\n\nCliente: ${customer.name
       }\n\nProdutos:\n${productsText}\n\nSubtotal: R$ ${subtotalValue.toFixed(
         2,
       )}\nDesconto: R$ ${discountValue.toFixed(
