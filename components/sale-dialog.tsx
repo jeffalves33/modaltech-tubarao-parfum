@@ -1,7 +1,7 @@
 // components/sales-dialog.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -61,6 +61,7 @@ interface DbCustomer {
 interface DbProduct {
   id: string
   name: string
+  barcode: string | null
   sale_price: number
   purchase_price: number
   stock_quantity: number
@@ -95,6 +96,10 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
     unitPrice: '',
   })
 
+  const [barcodeValue, setBarcodeValue] = useState('')
+  const barcodeRef = useRef<HTMLInputElement | null>(null)
+  const barcodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const [installmentDates, setInstallmentDates] = useState<Installment[]>([])
 
   // valores calculados em tempo real
@@ -116,7 +121,7 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
           supabase.from('customers').select('id, name, phone'),
           supabase
             .from('products')
-            .select('id, name, sale_price, purchase_price, stock_quantity')
+            .select('id, name, barcode, sale_price, purchase_price, stock_quantity')
             .eq('is_active', true),
         ])
 
@@ -142,6 +147,85 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
       cancelled = true
     }
   }, [open])
+
+  useEffect(() => {
+    if (!open || showSuccess) return
+
+    setBarcodeValue('')
+
+    const t = setTimeout(() => {
+      barcodeRef.current?.focus()
+    }, 50)
+
+    return () => clearTimeout(t)
+  }, [open, showSuccess])
+
+  const addOneUnitByBarcode = (codeRaw: string) => {
+    const code = codeRaw.trim()
+    if (!code) return
+    if (loadingBase) return
+
+    const baseProduct = availableProducts.find((p) => p.barcode === code)
+
+    // se não achou, só limpa pra você poder escanear o próximo
+    if (!baseProduct) {
+      setError('Código de barras não encontrado.')
+      setBarcodeValue('')
+      barcodeRef.current?.focus()
+      return
+    }
+
+    setProducts((prev) => {
+      const idx = prev.findIndex((it) => it.id === baseProduct.id)
+
+      // já está na lista -> soma +1 mantendo o preço atual daquele item
+      if (idx >= 0) {
+        const current = prev[idx]
+        const nextQty = current.quantity + 1
+
+        if (nextQty > baseProduct.stock_quantity) {
+          alert(
+            `Estoque insuficiente. Estoque atual: ${baseProduct.stock_quantity} unidade(s).`,
+          )
+          return prev
+        }
+
+        const next = [...prev]
+        next[idx] = {
+          ...current,
+          quantity: nextQty,
+          subtotal: nextQty * current.unitPrice,
+        }
+        return next
+      }
+
+      // não está na lista -> adiciona 1 unidade
+      if (baseProduct.stock_quantity < 1) {
+        alert(
+          `Estoque insuficiente. Estoque atual: ${baseProduct.stock_quantity} unidade(s).`,
+        )
+        return prev
+      }
+
+      const unitPrice = Number(baseProduct.sale_price)
+      const unitCost = Number(baseProduct.purchase_price) || 0
+
+      const newItem: ProductItem = {
+        id: baseProduct.id,
+        name: baseProduct.name,
+        quantity: 1,
+        unitPrice,
+        unitCost,
+        subtotal: unitPrice,
+      }
+
+      return [...prev, newItem]
+    })
+
+    setError(null)
+    setBarcodeValue('')
+    barcodeRef.current?.focus()
+  }
 
   const handleAddProduct = () => {
     setError(null)
@@ -443,6 +527,11 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
     setCurrentProduct({ id: '', name: '', quantity: '1', unitPrice: '' })
     setInstallmentDates([])
     setError(null)
+    if (barcodeTimerRef.current) {
+      clearTimeout(barcodeTimerRef.current)
+      barcodeTimerRef.current = null
+    }
+    setBarcodeValue('')
   }
 
   if (showSuccess) {
@@ -573,6 +662,34 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
 
           <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
             <Label>Adicionar Produtos</Label>
+            <div className="space-y-2">
+              <Label htmlFor="barcode">Código de barras</Label>
+              <Input
+                id="barcode"
+                ref={barcodeRef}
+                placeholder="Escaneie o produto..."
+                value={barcodeValue}
+                autoComplete="off"
+                onKeyDown={(e) => {
+                  // se o leitor mandar Enter, NÃO deixa submeter o form
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                  }
+                }}
+                onChange={(e) => {
+                  const value = e.target.value
+                  setBarcodeValue(value)
+                  setError(null)
+
+                  // debounce: ao “parar de digitar” (scanner terminou), tenta adicionar
+                  if (barcodeTimerRef.current) clearTimeout(barcodeTimerRef.current)
+                  barcodeTimerRef.current = setTimeout(() => {
+                    addOneUnitByBarcode(value)
+                  }, 80)
+                }}
+              />
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2 sm:col-span-2">
                 <Popover open={openProduct} onOpenChange={setOpenProduct}>

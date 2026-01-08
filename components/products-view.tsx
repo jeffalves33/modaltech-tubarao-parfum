@@ -35,6 +35,7 @@ interface Product {
   costPrice: number
   salePrice: number
   stock: number
+  barcode?: string
 }
 
 export function ProductsView() {
@@ -63,7 +64,7 @@ export function ProductsView() {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, brand, description, purchase_price, sale_price, stock_quantity, is_active')
+        .select('id, name, brand, barcode, description, purchase_price, sale_price, stock_quantity, is_active')
         .eq('is_active', true)
         .order('name', { ascending: true })
 
@@ -73,6 +74,7 @@ export function ProductsView() {
         id: p.id,
         name: p.name,
         brand: p.brand ?? '',
+        barcode: p.barcode ?? '',
         size: p.description ?? '',
         costPrice: Number(p.purchase_price ?? 0),
         salePrice: Number(p.sale_price ?? 0),

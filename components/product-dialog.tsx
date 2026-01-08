@@ -1,7 +1,7 @@
 // components/product-dialog.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,7 @@ interface Product {
   costPrice: number
   salePrice: number
   stock: number
+  barcode?: string
 }
 
 interface ProductDialogProps {
@@ -27,6 +28,7 @@ interface ProductDialogProps {
 
 export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductDialogProps) {
   const [formData, setFormData] = useState({
+    barcode: '',
     name: '',
     brand: '',
     size: '',
@@ -41,6 +43,7 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
   useEffect(() => {
     if (product) {
       setFormData({
+        barcode: product.barcode ?? '',
         name: product.name,
         brand: product.brand,
         size: product.size,
@@ -50,6 +53,7 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
       })
     } else {
       setFormData({
+        barcode: '',
         name: '',
         brand: '',
         size: '',
@@ -60,6 +64,15 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
     }
     setError(null)
   }, [product, open])
+
+  const barcodeRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const t = setTimeout(() => barcodeRef.current?.focus(), 50)
+    return () => clearTimeout(t)
+  }, [open])
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -88,6 +101,9 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
         stock_quantity: stockQuantity,
         is_active: true,
       }
+
+      const barcode = formData.barcode.trim()
+      payload.barcode = barcode.length ? barcode : null
 
       if (userId) {
         payload.created_by = userId
@@ -122,7 +138,7 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[800px]">
         <DialogHeader>
           <DialogTitle>{product ? 'Editar Produto' : 'Novo Produto'}</DialogTitle>
         </DialogHeader>
@@ -134,6 +150,17 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
+              <Label htmlFor="barcode">Código de barras</Label>
+              <Input
+                id="barcode"
+                ref={barcodeRef}
+                placeholder="Abrir e escanear..."
+                value={formData.barcode}
+                onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.preventDefault() // scanner costuma enviar Enter no final
+                }}
+              />
               <Label htmlFor="name">Nome do Produto</Label>
               <Input
                 id="name"
