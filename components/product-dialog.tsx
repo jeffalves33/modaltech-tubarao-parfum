@@ -31,6 +31,7 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
   const [formData, setFormData] = useState({
     barcode: '',
     name: '',
+    expirationDate: '',
     brand: '',
     size: '',
     costPrice: '',
@@ -46,6 +47,7 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
       setFormData({
         barcode: product.barcode ?? '',
         name: product.name,
+        expirationDate: product.expiration_date ? product.expiration_date : '',
         brand: product.brand,
         size: product.size,
         costPrice: product.costPrice.toString(),
@@ -56,6 +58,7 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
       setFormData({
         barcode: '',
         name: '',
+        expirationDate: '',
         brand: '',
         size: '',
         costPrice: '',
@@ -202,6 +205,7 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
 
       const payload: any = {
         name: formData.name.trim(),
+        expiration_date: formData.expirationDate || null,
         brand: formData.brand.trim(),
         description: formData.size.trim(), // usamos description como "tamanho"
         purchase_price: purchasePrice,
@@ -292,14 +296,6 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
                 />
                 Imprimir automaticamente ao salvar
               </label>
-
-              <Label htmlFor="name">Nome do Produto</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="brand">Marca</Label>
@@ -308,6 +304,31 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
                 value={formData.brand}
                 onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
                 required
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome do Produto</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="expiration">Validade</Label>
+              <Input
+                id="expiration"
+                type="date"
+                value={formData.expirationDate}
+                onChange={(e) =>
+                  setFormData({ ...formData, expirationDate: e.target.value })
+                }
               />
             </div>
           </div>

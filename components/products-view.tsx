@@ -16,6 +16,7 @@ import {
   TrendingUp,
   ChevronLeft,
   ChevronRight,
+  AlertTriangle,
 } from 'lucide-react'
 import {
   Select,
@@ -30,6 +31,7 @@ import { supabase } from '@/lib/supabaseClient'
 interface Product {
   id: string
   name: string
+  expirationDate?: string | null
   brand: string
   size: string
   costPrice: number
@@ -45,7 +47,7 @@ export function ProductsView() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [filterStock, setFilterStock] = useState<
-    'all' | 'in_stock' | 'low_stock' | 'out_of_stock'
+    'all' | 'in_stock' | 'low_stock' | 'out_of_stock' | 'expiring'
   >('all')
 
   const [sortBy, setSortBy] = useState<
@@ -64,7 +66,7 @@ export function ProductsView() {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, brand, barcode, description, purchase_price, sale_price, stock_quantity, is_active')
+        .select('id, name, brand, barcode, expiration_date, description, purchase_price, sale_price, stock_quantity, is_active')
         .eq('is_active', true)
         .order('name', { ascending: true })
 
@@ -73,6 +75,7 @@ export function ProductsView() {
       const mapped: Product[] = (data ?? []).map((p: any) => ({
         id: p.id,
         name: p.name,
+        expirationDate: p.expiration_date,
         brand: p.brand ?? '',
         barcode: p.barcode ?? '',
         size: p.description ?? '',
@@ -101,12 +104,21 @@ export function ProductsView() {
       p.brand.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  // filtro por estoque
+  const now = new Date()
+  const limitDate = new Date()
+  limitDate.setDate(limitDate.getDate() + 30)
+
+  // filtro por estoque / vencimento
   if (filterStock !== 'all') {
     filteredProducts = filteredProducts.filter((p) => {
       if (filterStock === 'in_stock') return p.stock > 0
       if (filterStock === 'low_stock') return p.stock > 0 && p.stock <= 3
       if (filterStock === 'out_of_stock') return p.stock === 0
+      if (filterStock === 'expiring') {
+        if (!p.expirationDate) return false
+        const exp = new Date(p.expirationDate)
+        return exp >= now && exp <= limitDate
+      }
       return true
     })
   }
@@ -145,6 +157,11 @@ export function ProductsView() {
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
   const paginatedProducts = sortedProducts.slice(startIndex, endIndex)
+  const expiringProductsCount = products.filter((p) => {
+    if (!p.expirationDate) return false
+    const exp = new Date(p.expirationDate)
+    return exp >= now && exp <= limitDate
+  }).length
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product)
@@ -185,7 +202,7 @@ export function ProductsView() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <p className="text-sm font-medium text-muted-foreground">
@@ -237,6 +254,22 @@ export function ProductsView() {
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Vecem este mês
+            </CardTitle>
+            <AlertTriangle className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">
+              {expiringProductsCount}
+            </div>
+          </CardContent>
+        </Card>
+
       </div>
 
       <Card>
@@ -281,6 +314,7 @@ export function ProductsView() {
                   <SelectItem value="in_stock">Com estoque</SelectItem>
                   <SelectItem value="low_stock">Estoque baixo (≤ 3)</SelectItem>
                   <SelectItem value="out_of_stock">Sem estoque</SelectItem>
+                  <SelectItem value="expiring">Vencem este mês</SelectItem>
                 </SelectContent>
               </Select>
 
