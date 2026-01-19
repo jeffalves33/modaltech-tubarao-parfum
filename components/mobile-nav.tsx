@@ -56,7 +56,7 @@ export function MobileNav({ currentView, onViewChange }: MobileNavProps) {
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground overflow-hidden">
                 <img
-                  src="/icon.jpg"
+                  src="/icon.png"
                   alt="Logo"
                   className="object-cover"
                 />
@@ -99,7 +99,7 @@ export function MobileNav({ currentView, onViewChange }: MobileNavProps) {
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground overflow-hidden">
           <img
-            src="/icon.jpg"
+            src="/icon.png"
             alt="Logo"
             className="object-cover"
           />

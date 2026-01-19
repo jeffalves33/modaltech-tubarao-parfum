@@ -54,7 +54,7 @@ function LoginPageInner() {
         <CardHeader className="space-y-4 text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-primary rounded-lg text-primary-foreground overflow-hidden">
             <img
-              src="/icon.jpg"
+              src="/icon.png"
               alt="Logo"
               className="object-cover"
             />
