@@ -946,7 +946,7 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
                         </span>
                         <Input
                           type="number"
-                          step="1"
+                          step="0.01"
                           min="0"
                           value={installment.value.toFixed(2)}
                           onChange={(e) =>
