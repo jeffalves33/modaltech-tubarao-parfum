@@ -40,7 +40,7 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [autoPrintBarcode, setAutoPrintBarcode] = useState(true)
+  const [autoPrintBarcode, setAutoPrintBarcode] = useState(false)
 
   useEffect(() => {
     if (product) {
@@ -67,7 +67,7 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
       })
     }
     setError(null)
-    setAutoPrintBarcode(true)
+    setAutoPrintBarcode(false)
   }, [product, open])
 
   const barcodeRef = useRef<HTMLInputElement | null>(null)
