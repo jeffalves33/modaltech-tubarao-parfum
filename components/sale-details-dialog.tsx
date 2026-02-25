@@ -4,6 +4,8 @@
 import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Share2 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 
 interface Sale {
@@ -161,11 +163,85 @@ export function SaleDetailsDialog({ sale, open, onOpenChange }: SaleDetailsDialo
     return d.toLocaleDateString('pt-BR')
   }
 
+  const handleShareWhatsApp = async () => {
+    try {
+      // 1) pegar customer_id da venda
+      const { data: saleRow, error: saleErr } = await supabase
+        .from('sales')
+        .select('customer_id')
+        .eq('id', sale.id)
+        .single()
+
+      if (saleErr) throw saleErr
+
+      const customerId = saleRow?.customer_id
+      if (!customerId) {
+        alert('Esta venda não está ligada a um cliente.')
+        return
+      }
+
+      // 2) pegar telefone do cliente
+      const { data: customerRow, error: custErr } = await supabase
+        .from('customers')
+        .select('name, phone')
+        .eq('id', customerId)
+        .single()
+
+      if (custErr) throw custErr
+
+      if (!customerRow?.phone) {
+        alert('Este cliente não possui telefone cadastrado.')
+        return
+      }
+
+      const productsText =
+        items.length === 0
+          ? sale.productsSummary
+          : items
+            .map((it) => `${it.productName} (${it.quantity}x) - ${formatCurrency(it.subtotal)}`)
+            .join('\n')
+
+      const message =
+        `*Comprovante de Venda - Angel Cosméticos*\n\n` +
+        `Cliente: ${customerRow.name || sale.customer}\n` +
+        `Data: ${sale.date}\n\n` +
+        `Produtos:\n${productsText}\n\n` +
+        `Valor Total: ${formatCurrency(sale.totalValue)}\n` +
+        `Valor Pago: ${formatCurrency(sale.paidAmount)}\n` +
+        `Valor Pendente: ${formatCurrency(pendingAmount)}\n` +
+        `Forma de Pagamento: ${sale.paymentType === 'cash'
+          ? 'À vista'
+          : `Parcelado${sale.installments ? ` em ${sale.installments}x` : ''}`
+        }\n\n` +
+        `Obrigado pela preferência!`
+
+      const phone = String(customerRow.phone).replace(/\D/g, '')
+      window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message)}`, '_blank')
+    } catch (err) {
+      console.error('Erro ao compartilhar no WhatsApp', err)
+      alert('Erro ao preparar mensagem do WhatsApp.')
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[650px] max-h-[95vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Detalhes da Venda</DialogTitle>
+          <div className="flex items-center gap-2">
+            <DialogTitle className="leading-none">Detalhes da Venda</DialogTitle>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={handleShareWhatsApp}
+              aria-label="Compartilhar no WhatsApp"
+              title="Compartilhar no WhatsApp"
+              className="h-8 w-8"
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
+          </div>
         </DialogHeader>
 
         {loading && (

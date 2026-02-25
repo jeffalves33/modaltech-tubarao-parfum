@@ -10,26 +10,26 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Modaltech',
+  title: 'Prodexy',
   description: 'Sistema completo de gestão de vendas de perfumes',
-  generator: 'Modaltech',
+  generator: 'Prodexy',
   themeColor: '#ffffff',
   icons: {
     icon: [
       {
-        url: '/icon_modaltech.png',
+        url: '/icon_transp.png',
         media: '(prefers-color-scheme: light)',
       },
       {
-        url: '/icon_modaltech.png',
+        url: '/icon_prodexy.png',
         media: '(prefers-color-scheme: dark)',
       },
       {
-        url: '/icon_modaltech_simbolo.png',
+        url: '/icon_transp.png',
         type: 'image/svg+xml',
       },
     ],
-    apple: '/icon_modaltech.png',
+    apple: '/icon_prodexy.png',
   },
 }
 

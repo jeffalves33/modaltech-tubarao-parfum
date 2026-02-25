@@ -4,8 +4,8 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
     return {
-        name: 'Modaltech',
-        short_name: 'Modaltech',
+        name: 'Prodexy',
+        short_name: 'Prodexy',
         start_url: '/',
         scope: '/',
         display: 'standalone',
@@ -14,12 +14,12 @@ export default function manifest(): MetadataRoute.Manifest {
         theme_color: '#ffffff',
         icons: [
             {
-                src: '/icon_modaltech.png',
+                src: '/icon_prodexy.png',
                 sizes: '192x192',
                 type: 'image/png',
             },
             {
-                src: '/icon_modaltech.png',
+                src: '/icon_prodexy.png',
                 sizes: '512x512',
                 type: 'image/png',
             },

@@ -157,6 +157,32 @@ export function ProductsView() {
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
   const paginatedProducts = sortedProducts.slice(startIndex, endIndex)
+  // Paginação "inteligente": mostra poucas páginas e vai mudando conforme navega
+  const getVisiblePages = () => {
+    const maxButtons = 7 // ajuste se quiser (5, 7, 9...)
+    const pages: (number | 'dots')[] = []
+
+    if (totalPages <= maxButtons) {
+      for (let p = 1; p <= totalPages; p++) pages.push(p)
+      return pages
+    }
+
+    const siblingCount = 1 // quantas páginas de "folga" ao lado da atual
+    const left = Math.max(2, currentPage - siblingCount)
+    const right = Math.min(totalPages - 1, currentPage + siblingCount)
+
+    pages.push(1)
+
+    if (left > 2) pages.push('dots')
+
+    for (let p = left; p <= right; p++) pages.push(p)
+
+    if (right < totalPages - 1) pages.push('dots')
+
+    pages.push(totalPages)
+
+    return pages
+  }
   const expiringProductsCount = products.filter((p) => {
     if (!p.expirationDate) return false
     const exp = new Date(p.expirationDate)
@@ -350,6 +376,7 @@ export function ProductsView() {
                   <th className="pb-3 text-right">Custo</th>
                   <th className="pb-3 text-right">Venda</th>
                   <th className="pb-3 text-right">Estoque</th>
+                  <th className="pb-3 text-right">Validade</th>
                   <th className="pb-3 text-right">Ações</th>
                 </tr>
               </thead>
@@ -358,23 +385,10 @@ export function ProductsView() {
                   <tr key={product.id} className="border-b last:border-0">
                     <td className="py-4 font-medium max-w-[250px] truncate">{product.name}</td>
                     <td className="py-4 text-muted-foreground max-w-[150px] truncate">{product.brand}</td>
-                    <td className="py-4 text-right">
-                      R$ {product.costPrice.toFixed(2)}
-                    </td>
-                    <td className="py-4 text-right">
-                      R$ {product.salePrice.toFixed(2)}
-                    </td>
-                    <td className="py-4 text-right">
-                      <span
-                        className={
-                          product.stock <= 3
-                            ? 'text-destructive font-medium'
-                            : ''
-                        }
-                      >
-                        {product.stock}
-                      </span>
-                    </td>
+                    <td className="py-4 text-right">R$ {product.costPrice.toFixed(2)}</td>
+                    <td className="py-4 text-right">R$ {product.salePrice.toFixed(2)}</td>
+                    <td className="py-4 text-right"><span className={product.stock <= 3 ? 'text-destructive font-medium' : ''}> {product.stock}</span></td>
+                    <td className="py-4 text-right">{product.expirationDate}</td>
                     <td className="py-4">
                       <div className="flex justify-end gap-2">
                         <Button
@@ -427,16 +441,20 @@ export function ProductsView() {
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                    (page) => (
+                  {getVisiblePages().map((item, idx) =>
+                    item === 'dots' ? (
+                      <span key={`dots-${idx}`} className="px-2 text-muted-foreground">
+                        ...
+                      </span>
+                    ) : (
                       <Button
-                        key={page}
-                        variant={currentPage === page ? 'default' : 'outline'}
+                        key={item}
+                        variant={currentPage === item ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => setCurrentPage(page)}
+                        onClick={() => setCurrentPage(item)}
                         className="w-8 h-8 p-0"
                       >
-                        {page}
+                        {item}
                       </Button>
                     ),
                   )}
@@ -463,6 +481,6 @@ export function ProductsView() {
         product={editingProduct}
         onSaved={loadProducts}
       />
-    </div>
+    </div >
   )
 }
