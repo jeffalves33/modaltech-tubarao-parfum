@@ -86,6 +86,7 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
     paymentType: 'cash',
     installments: '1',
     discount: '0',
+    fee: '0',
   })
 
   const [products, setProducts] = useState<ProductItem[]>([])
@@ -104,8 +105,9 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
 
   // valores calculados em tempo real
   const subtotalValue = products.reduce((sum, p) => sum + p.subtotal, 0)
+  const feeValue = subtotalValue * (Number(formData.fee) / 100)
   const discountValue = subtotalValue * (Number(formData.discount) / 100)
-  const totalValue = subtotalValue - discountValue
+  const totalValue = subtotalValue + feeValue - discountValue
 
   // carrega clientes e produtos ao abrir o diálogo
   useEffect(() => {
@@ -339,9 +341,11 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
       const userId = user?.id ?? null
 
       const discountPercent = Number(formData.discount) || 0
+      const feePercent = Number(formData.fee) || 0
       const currentSubtotal = products.reduce((sum, p) => sum + p.subtotal, 0)
+      const currentFeeValue = currentSubtotal * (feePercent / 100)
       const currentDiscountValue = currentSubtotal * (discountPercent / 100)
-      const currentTotalValue = currentSubtotal - currentDiscountValue
+      const currentTotalValue = currentSubtotal + currentFeeValue - currentDiscountValue
 
       if (formData.paymentType === 'credit') {
         if (installmentDates.length === 0) {
@@ -378,6 +382,7 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
           customer_id: formData.customer || null,
           total_amount: currentTotalValue,
           discount: currentDiscountValue,
+          fee: currentFeeValue,
           status: formData.paymentType === 'cash' ? 'paid' : 'open',
           created_by: userId,
         })
@@ -460,6 +465,7 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
         ...formData,
         products,
         subtotalValue: currentSubtotal,
+        feeValue: currentFeeValue,
         discountValue: currentDiscountValue,
         totalValue: currentTotalValue,
         installmentDates:
@@ -522,6 +528,7 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
       paymentType: 'cash',
       installments: '1',
       discount: '0',
+      fee: '0',
     })
     setProducts([])
     setCurrentProduct({ id: '', name: '', quantity: '1', unitPrice: '' })
@@ -837,6 +844,21 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
             />
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="fee">Taxa (%)</Label>
+            <Input
+              id="fee"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={formData.fee}
+              onChange={(e) =>
+                setFormData({ ...formData, fee: e.target.value })
+              }
+            />
+          </div>
+
           <div className="rounded-lg bg-muted p-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal</span>
@@ -844,16 +866,29 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
                 R$ {subtotalValue.toFixed(2)}
               </span>
             </div>
+
+            {Number(formData.fee) > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Taxa ({formData.fee}%)
+                </span>
+                <span className="font-medium text-emerald-600">
+                  + R$ {feeValue.toFixed(2)}
+                </span>
+              </div>
+            )}
+
             {Number(formData.discount) > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">
                   Desconto ({formData.discount}%)
                 </span>
-                <span className="font-medium text-emerald-600">
+                <span className="font-medium text-red-600">
                   - R$ {discountValue.toFixed(2)}
                 </span>
               </div>
             )}
+
             <div className="flex justify-between pt-2 border-t">
               <span className="text-sm text-muted-foreground">
                 Valor Total
