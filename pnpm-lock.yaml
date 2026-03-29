@@ -3218,6 +3218,3 @@ snapshots:
   ws@8.18.3: {}
 
   zod@3.25.76: {}
-
-onlyBuiltDependencies:
-- "@prodexy/ui"
