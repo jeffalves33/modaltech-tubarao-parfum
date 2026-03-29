@@ -2,9 +2,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent,
+  DialogDescription, DialogHeader, DialogTitle } from '@prodexy/ui'
+import { Badge } from '@prodexy/ui'
+import { Button } from '@prodexy/ui'
 import { Share2 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -229,6 +230,7 @@ export function SaleDetailsDialog({ sale, open, onOpenChange }: SaleDetailsDialo
         <DialogHeader>
           <div className="flex items-center gap-2">
             <DialogTitle className="leading-none">Detalhes da Venda</DialogTitle>
+        <DialogDescription>Detalhes da venda.</DialogDescription>
 
             <Button
               type="button"

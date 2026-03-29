@@ -5,30 +5,31 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+} from '@prodexy/ui'
+import { Button } from '@prodexy/ui'
+import { Input } from '@prodexy/ui'
+import { Label } from '@prodexy/ui'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from '@prodexy/ui'
 import {
   Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
-} from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+} from '@prodexy/ui'
+import { Popover, PopoverContent, PopoverTrigger } from '@prodexy/ui'
 import { Check, ChevronsUpDown, Printer, Share2, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@prodexy/ui'
 import { supabase } from '@/lib/supabaseClient'
 
 interface SaleDialogProps {
@@ -547,6 +548,7 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Venda Registrada com Sucesso!</DialogTitle>
+        <DialogDescription>Preencha os dados da venda.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="rounded-lg bg-muted p-4 space-y-2">

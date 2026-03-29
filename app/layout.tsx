@@ -1,46 +1,42 @@
-// app/layout.tsx
-
-import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import type { Metadata, Viewport } from 'next'
+import { Poppins, DM_Sans } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { PWARegister } from '@/components/pwa-register'
+import { brand } from '@/branding/brand'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const headingFont = Poppins({
+  subsets: ['latin'],
+  variable: '--font-heading',
+  weight: ['400', '500', '600', '700'],
+})
+
+const bodyFont = DM_Sans({
+  subsets: ['latin'],
+  variable: '--font-body',
+  weight: ['400', '500', '700'],
+})
 
 export const metadata: Metadata = {
-  title: 'Prodexy',
-  description: 'Sistema completo de gestão de vendas de perfumes',
+  title: brand.appName,
+  description: brand.description,
   generator: 'Prodexy',
-  themeColor: '#ffffff',
   icons: {
-    icon: [
-      {
-        url: '/icon_transp.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon_prodexy.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon_transp.png',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/icon_prodexy.png',
+    icon: [{ url: brand.logoUrl }],
+    apple: brand.logoUrl,
   },
+}
+
+export const viewport: Viewport = {
+  themeColor: brand.colors.primary,
 }
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-BR">
-      <body className="font-sans antialiased">
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body className={`${headingFont.variable} ${bodyFont.variable} font-sans antialiased`}>
         <PWARegister />
         {children}
         <Analytics />

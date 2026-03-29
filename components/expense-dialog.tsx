@@ -5,22 +5,23 @@ import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+} from '@prodexy/ui'
+import { Button } from '@prodexy/ui'
+import { Input } from '@prodexy/ui'
+import { Label } from '@prodexy/ui'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+} from '@prodexy/ui'
+import { Textarea } from '@prodexy/ui'
+import { RadioGroup, RadioGroupItem } from '@prodexy/ui'
 import { supabase } from '@/lib/supabaseClient'
 
 type ExpenseType = 'fixed' | 'variable'
@@ -148,6 +149,7 @@ export function ExpenseDialog({
           <DialogTitle>
             {expense ? 'Editar Despesa' : 'Nova Despesa'}
           </DialogTitle>
+        <DialogDescription>Preencha os dados da despesa.</DialogDescription>
         </DialogHeader>
 
         {error && (

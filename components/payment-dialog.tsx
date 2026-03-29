@@ -5,14 +5,15 @@ import { useEffect, useState } from 'react'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+} from '@prodexy/ui'
+import { Button } from '@prodexy/ui'
+import { Input } from '@prodexy/ui'
+import { Label } from '@prodexy/ui'
+import { RadioGroup, RadioGroupItem } from '@prodexy/ui'
 import { supabase } from '@/lib/supabaseClient'
 
 type ReceivableStatus = 'open' | 'partial' | 'overdue' | 'paid'
@@ -144,6 +145,7 @@ export function PaymentDialog({ receivable, open, onOpenChange, onPaid, }: Payme
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
           <DialogTitle>Confirmar Pagamento</DialogTitle>
+        <DialogDescription>Preencha os dados do pagamento.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

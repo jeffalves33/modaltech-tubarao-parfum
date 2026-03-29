@@ -3,10 +3,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Barcode } from 'lucide-react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent,
+  DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@prodexy/ui'
+import { Button } from '@prodexy/ui'
+import { Input } from '@prodexy/ui'
+import { Label } from '@prodexy/ui'
 import { supabase } from '@/lib/supabaseClient'
 
 interface Product {
@@ -255,6 +256,7 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
       <DialogContent className="sm:max-w-[800px]">
         <DialogHeader>
           <DialogTitle>{product ? 'Editar Produto' : 'Novo Produto'}</DialogTitle>
+        <DialogDescription>Preencha os dados do produto.</DialogDescription>
         </DialogHeader>
 
         {error && (

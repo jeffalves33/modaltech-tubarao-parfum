@@ -3,10 +3,10 @@
 import { Suspense } from 'react'
 import { FormEvent, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@prodexy/ui'
+import { Button } from '@prodexy/ui'
+import { Input } from '@prodexy/ui'
+import { Label } from '@prodexy/ui'
 import { supabase } from '@/lib/supabaseClient'
 
 function LoginPageInner() {

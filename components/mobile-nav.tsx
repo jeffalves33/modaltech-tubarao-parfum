@@ -1,44 +1,31 @@
-// components/mobile-nav.tsx
 'use client'
 
-import { Menu, Package, LogOut } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from '@/components/ui/sheet'
-import { LayoutDashboard, Users, ShoppingCart, Receipt, DollarSign } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { Menu, Package, LogOut, LayoutDashboard, Users, ShoppingCart, Receipt, DollarSign } from 'lucide-react'
+import { Button, Sheet, SheetContent, SheetTrigger, cn } from '@prodexy/ui'
 import { supabase } from '@/lib/supabaseClient'
 
-interface MobileNavProps {
-  currentView: string
-  onViewChange: (view: 'dashboard' | 'products' | 'customers' | 'sales' | 'receivables' | 'expenses') => void
-}
+export function MobileNav() {
+  const pathname = usePathname()
 
-export function MobileNav({ currentView, onViewChange }: MobileNavProps) {
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'products', label: 'Produtos', icon: Package },
-    { id: 'customers', label: 'Clientes', icon: Users },
-    { id: 'sales', label: 'Vendas', icon: ShoppingCart },
-    { id: 'receivables', label: 'Contas a Receber', icon: Receipt },
-    { id: 'expenses', label: 'Despesas', icon: DollarSign },
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/products', label: 'Produtos', icon: Package },
+    { href: '/customers', label: 'Clientes', icon: Users },
+    { href: '/sales', label: 'Vendas', icon: ShoppingCart },
+    { href: '/receivables', label: 'Contas a Receber', icon: Receipt },
+    { href: '/expenses', label: 'Despesas', icon: DollarSign },
   ]
 
   const handleLogout = async () => {
     try {
-      // encerra a sessão do Supabase (remove cookie)
       await supabase.auth.signOut()
     } catch (error) {
       console.error('Erro ao deslogar do Supabase', error)
     } finally {
-      // se você ainda quiser limpar qualquer lixo antigo no localStorage:
       localStorage.removeItem('isAuthenticated')
       localStorage.removeItem('userEmail')
-
-      // redireciona para login
       window.location.href = '/login'
     }
   }
@@ -51,60 +38,59 @@ export function MobileNav({ currentView, onViewChange }: MobileNavProps) {
             <Menu className="h-6 w-6" />
           </Button>
         </SheetTrigger>
+
         <SheetContent side="left" className="w-64 p-0">
           <div className="flex h-16 shrink-0 items-center border-b px-6">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground overflow-hidden">
-                <img
-                  src="/icon.png"
-                  alt="Logo"
-                  className="object-cover"
-                />
+                <img src="/icon.png" alt="Logo" className="object-cover" />
               </div>
               <span className="text-lg font-semibold">Angel Cosméticos</span>
             </div>
           </div>
+
           <nav className="flex flex-1 flex-col p-6">
             <ul className="flex flex-1 flex-col gap-y-2">
               {menuItems.map((item) => {
                 const Icon = item.icon
+                const active = pathname === item.href
                 return (
-                  <li key={item.id}>
-                    <button
-                      onClick={() => onViewChange(item.id as any)}
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
                       className={cn(
                         'group flex w-full gap-x-3 rounded-lg p-3 text-sm font-medium leading-6 transition-colors',
-                        currentView === item.id
+                        active
                           ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                       )}
                     >
                       <Icon className="h-5 w-5 shrink-0" />
                       {item.label}
-                    </button>
+                    </Link>
                   </li>
                 )
               })}
             </ul>
-            <button
-              onClick={handleLogout}
-              className="flex w-full gap-x-3 rounded-lg p-3 text-sm font-medium leading-6 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors mt-4"
-            >
-              <LogOut className="h-5 w-5 shrink-0" />
-              Sair
-            </button>
+
+            <div className="border-t pt-4">
+              <button
+                onClick={handleLogout}
+                className="flex w-full gap-x-3 rounded-lg p-3 text-sm font-medium leading-6 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                <LogOut className="h-5 w-5 shrink-0" />
+                Sair
+              </button>
+            </div>
           </nav>
         </SheetContent>
       </Sheet>
+
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground overflow-hidden">
-          <img
-            src="/icon.png"
-            alt="Logo"
-            className="object-cover"
-          />
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground overflow-hidden">
+          <img src="/icon.png" alt="Logo" className="object-cover" />
         </div>
-        <span className="text-lg font-semibold">Angel Cosméticos</span>
+        <span className="font-semibold">Angel Cosméticos</span>
       </div>
     </div>
   )

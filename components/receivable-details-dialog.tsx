@@ -6,12 +6,13 @@ import { useEffect, useState } from 'react'
 import {
     Dialog,
     DialogContent,
+  DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogFooter,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+} from '@prodexy/ui'
+import { Button } from '@prodexy/ui'
+import { Badge } from '@prodexy/ui'
 import { supabase } from '@/lib/supabaseClient'
 import { AlertCircle } from 'lucide-react'
 
@@ -224,6 +225,7 @@ export function ReceivableDetailsDialog({
             <DialogContent className="sm:max-w-[650px]">
                 <DialogHeader>
                     <DialogTitle>Detalhes da Parcela</DialogTitle>
+        <DialogDescription>Detalhes da conta a receber.</DialogDescription>
                 </DialogHeader>
 
                 {error && (
