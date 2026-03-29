@@ -36,7 +36,7 @@ export function Sidebar() {
         <div className="flex h-16 shrink-0 items-center border-b">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground overflow-hidden">
-              <img src="/icon.png" alt="Logo" className="object-cover" />
+              <img src="/icon.jpg" alt="Logo" className="object-cover" />
             </div>
             <span className="text-lg font-semibold">Angel Cosméticos</span>
           </div>
