@@ -88,14 +88,6 @@ export function ExpenseDialog({
     setLoading(true)
 
     try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-
-      if (userError) throw userError
-      const userId = user?.id ?? null
-
       const amount = Number(
         formData.amount.replace('.', '').replace(',', '.'),
       )
@@ -123,10 +115,6 @@ export function ExpenseDialog({
 
         if (error) throw error
       } else {
-        if (userId) {
-          payload.created_by = userId
-        }
-
         const { error } = await supabase.from('expenses').insert(payload)
 
         if (error) throw error

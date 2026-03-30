@@ -192,14 +192,6 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
     setLoading(true)
 
     try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-
-      if (userError) throw userError
-      const userId = user?.id ?? null
-
       const purchasePrice = Number(formData.costPrice.replace(',', '.')) || 0
       const salePrice = Number(formData.salePrice.replace(',', '.')) || 0
       const stockQuantity = Number(formData.stock) || 0
@@ -217,10 +209,6 @@ export function ProductDialog({ open, onOpenChange, product, onSaved }: ProductD
 
       const barcode = formData.barcode.trim()
       payload.barcode = barcode.length ? barcode : null
-
-      if (userId) {
-        payload.created_by = userId
-      }
 
       if (product) {
         // update

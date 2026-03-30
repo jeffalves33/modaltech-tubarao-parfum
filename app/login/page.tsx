@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabaseClient'
 function LoginPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('from') || '/'
+  const redirectTo = searchParams.get('from') || '/dashboard'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -31,18 +31,37 @@ function LoginPageInner() {
     setLoading(true)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (error) {
+      if (error || !data.user) {
         console.error(error)
         setError('Email ou senha inválidos.')
         return
       }
 
-      router.push(redirectTo)
+      const { data: perfil, error: perfilError } = await supabase
+        .from('perfis')
+        .select('papel, ativo')
+        .eq('id', data.user.id)
+        .single()
+
+      if (perfilError || !perfil || !perfil.ativo) {
+        await supabase.auth.signOut()
+        setError('Seu acesso está inativo ou inválido.')
+        return
+      }
+
+      if (perfil.papel !== 'admin') {
+        await supabase.auth.signOut()
+        setError('Seu perfil não tem acesso a este projeto.')
+        return
+      }
+
+      router.push(redirectTo || '/dashboard')
+      router.refresh()
     } finally {
       setLoading(false)
     }

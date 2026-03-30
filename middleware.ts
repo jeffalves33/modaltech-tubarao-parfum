@@ -1,20 +1,18 @@
-// middleware.ts
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
-    const isAuthRoute = pathname.startsWith('/login')
 
-    if (
+    const isAuthRoute = pathname.startsWith('/login')
+    const isPublicAsset =
         pathname === '/manifest.webmanifest' ||
         pathname === '/sw.js' ||
         pathname === '/favicon.ico' ||
-        pathname.startsWith('/icon_prodexy') ||
+        pathname.startsWith('/icon') ||
         pathname.startsWith('/_next')
-    ) {
-        return NextResponse.next()
-    }
+
+    if (isPublicAsset) return NextResponse.next()
 
     let response = NextResponse.next({
         request: {
@@ -52,29 +50,54 @@ export async function middleware(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser()
 
+    let perfil: { papel: string; ativo: boolean } | null = null
+
+    if (user) {
+        const { data } = await supabase
+            .from('perfis')
+            .select('papel, ativo')
+            .eq('id', user.id)
+            .single()
+
+        perfil = data
+    }
+
+    if (pathname === '/') {
+        if (!user || !perfil || !perfil.ativo) {
+            return NextResponse.redirect(new URL('/login', request.url))
+        }
+
+        if (perfil.papel === 'admin') {
+            return NextResponse.redirect(new URL('/dashboard', request.url))
+        }
+
+        return NextResponse.redirect(new URL('/login', request.url))
+    }
+
     if (isAuthRoute) {
-        if (user) {
-            const url = request.nextUrl.clone()
-            url.pathname = '/'
-            url.searchParams.delete('from')
-            return NextResponse.redirect(url)
+        if (!user || !perfil || !perfil.ativo) return response
+
+        if (perfil.papel === 'admin') {
+            return NextResponse.redirect(new URL('/dashboard', request.url))
         }
 
         return response
     }
 
-    if (!user) {
+    if (!user || !perfil || !perfil.ativo) {
         const url = request.nextUrl.clone()
         url.pathname = '/login'
         url.searchParams.set('from', pathname)
         return NextResponse.redirect(url)
     }
 
+    if (perfil.papel !== 'admin') {
+        return NextResponse.redirect(new URL('/login', request.url))
+    }
+
     return response
 }
 
 export const config = {
-    matcher: [
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-    ],
+    matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }

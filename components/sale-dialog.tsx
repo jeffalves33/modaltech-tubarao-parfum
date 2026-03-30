@@ -333,14 +333,6 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
     setSubmitLoading(true)
 
     try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-
-      if (userError) throw userError
-      const userId = user?.id ?? null
-
       const discountPercent = Number(formData.discount) || 0
       const feePercent = Number(formData.fee) || 0
       const currentSubtotal = products.reduce((sum, p) => sum + p.subtotal, 0)
@@ -385,7 +377,6 @@ export function SaleDialog({ open, onOpenChange, onSaleCreated }: SaleDialogProp
           discount: currentDiscountValue,
           fee: currentFeeValue,
           status: formData.paymentType === 'cash' ? 'paid' : 'open',
-          created_by: userId,
         })
         .select('id')
         .single()

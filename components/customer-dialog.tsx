@@ -67,15 +67,6 @@ export function CustomerDialog({
     setLoading(true)
 
     try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-
-      if (userError) throw userError
-
-      const userId = user?.id ?? null
-
       const payload: any = {
         name: formData.name.trim(),
         phone: formData.phone.trim(),
@@ -95,10 +86,6 @@ export function CustomerDialog({
         if (error) throw error
       } else {
         // insert
-        if (userId) {
-          payload.created_by = userId
-        }
-
         const { error } = await supabase.from('customers').insert(payload)
 
         if (error) throw error

@@ -24,8 +24,6 @@ export function Sidebar() {
     } catch (error) {
       console.error('Erro ao deslogar do Supabase', error)
     } finally {
-      localStorage.removeItem('isAuthenticated')
-      localStorage.removeItem('userEmail')
       window.location.href = '/login'
     }
   }
